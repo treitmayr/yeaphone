@@ -29,6 +29,8 @@
 
 typedef enum { YL_CALL_NONE, YL_CALL_IN, YL_CALL_OUT } yl_call_type_t;
 typedef enum { YL_STORE_NONE, YL_STORE_ON } yl_store_type_t;
+typedef enum { YL_REP_NONE, YL_REP_ON } yl_rep_type_t;
+typedef enum { YL_NEW_NONE, YL_NEW_ON } yl_new_type_t;
 typedef enum { YL_RINGER_OFF, YL_RINGER_ON } yl_ringer_state_t;
 
 void yldisp_init();
@@ -48,6 +50,12 @@ yl_call_type_t get_yldisp_call_type();
 void set_yldisp_store_type(yl_store_type_t st);
 yl_store_type_t get_yldisp_store_type();
 
+void set_yldisp_rep_type(yl_rep_type_t st);
+yl_rep_type_t get_yldisp_rep_type();
+
+void set_yldisp_new_type(yl_new_type_t nt);
+yl_new_type_t get_yldisp_new_type();
+
 void set_yldisp_ringer(yl_ringer_state_t rs);
 yl_ringer_state_t get_yldisp_ringer();
 
@@ -56,6 +64,9 @@ void yldisp_ringer_vol_down();
 
 void set_yldisp_text(char *text);
 char *get_yldisp_text();
+
+void set_yldisp_num(char *num);
+char *get_yldisp_num();
 
 void yldisp_hide_all();
 

@@ -2,3 +2,9 @@
 
 	* yeaphone: initial version.
 
+2007-06-07  Michael Keller <mikeller@gmail.com>
+
+      * yeaphone-0.1.1: added dialled / received calls list
+      * yeaphone-0.1.1: improved ui
+      * yeaphone-0.1.1: added possibility to lock memory
+
