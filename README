@@ -1,6 +1,6 @@
 YeaPhone - a SIP phone for Yealink USB-P1K handsets using liblinphone
 ========
-(c) Copyright 2006 by Thomas Reitmayr (treimtayr@yahoo.com)
+(c) Copyright 2006 by Thomas Reitmayr (treitmayr@yahoo.com)
 Homepage: <http://www.devbase.at/>
 Released under the GNU GENERAL PUBLIC LICENSE v2 or later
 
@@ -199,7 +199,7 @@ The various keys have the following functions:
             on/off a phone) 
 
 The number in the upper right corner of the phone display indicates
-the umber of new incoming calls when in normal mode.
+the number of new incoming calls when in normal mode.
 When in memory display mode ("STORE" is displayed in the upper right
 corner) the number indicates the memory position of the number
 displayed.
