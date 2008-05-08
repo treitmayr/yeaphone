@@ -5,6 +5,7 @@ aclocal.m4
 configure
 config.log
 config.status
+config.h.in
 config.h
 config
 yeaphone-*.tar.gz
