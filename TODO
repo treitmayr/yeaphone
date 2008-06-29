@@ -12,6 +12,15 @@ Future Features:
 
 * store the complete SIP URL for last calls and stored calls
 
+* keep a history of incoming/outgoing calls and allow
+  scrolling through it with the UP/DOWN buttons; the IN/OUT marker
+  should tell whether it was an incoming or outgoing call, the
+  time/date of the call should be shown and the number (right-most)
+  would be an index.
+  Q: Where to display the duration of the call???
+  the calls history should be stored in a configurable file
+  (so it can also be placed on a RAM drive)
+  
 * whenever registration fails, restart the blinking LED
 
 * allow to associate shell commands for each state change,

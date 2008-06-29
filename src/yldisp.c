@@ -371,7 +371,7 @@ void *counter_proc(void *arg) {
   while (1) {
     if (yld_ptr->counter_state == YL_COUNTER_OFF) {
       /* no counting requested yet */
-	    yld_write_control_file(&yldisp_data, "line1", "           ");
+      yld_write_control_file(&yldisp_data, "line1", "           \t\t\t   ");
       yld_write_control_file(yld_ptr, "line2", "\t\t       ");
       pthread_cond_wait(yld_ptr->count_cond, yld_ptr->count_mutex);
       init = 1;
@@ -410,13 +410,9 @@ void *counter_proc(void *arg) {
         yld_write_control_file(yld_ptr, "line2", line2);
       }
       
-	    sprintf(line1, "%2d.%2d.%2d.%02d",
-		    tms->tm_mon + 1, tms->tm_mday, tms->tm_hour,
-		    tms->tm_min);
-	    yld_write_control_file(yld_ptr, "line1", line1);
-
-	    usleep(500000);
-	    line1[8] = ' ';
+      sprintf(line1, "%2d.%2d.%2d.%02d\t\t\t %02d",
+              tms->tm_mon + 1, tms->tm_mday,
+              tms->tm_hour, tms->tm_min, tms->tm_sec);
       yld_write_control_file(yld_ptr, "line1", line1);
       
       abstime.tv_sec++;
@@ -443,7 +439,7 @@ void *counter_proc(void *arg) {
           m -= h * 60;
         }
       }
-	    sprintf(line1, "   %2d %2d.%02d", h, m, s);
+      sprintf(line1, "      %2d.%02d\t\t\t %02d", h, m, s);
       yld_write_control_file(yld_ptr, "line1", line1);
       
       abstime.tv_sec++;
@@ -525,50 +521,12 @@ void set_yldisp_store_type(yl_store_type_t st) {
 }
 
 
-yl_store_type_t get_yldisp_store_type()
-{
-    return (0);
-}
-
-
-void set_yldisp_rep_type(yl_rep_type_t rt)
-{
-    char line2[9];
-
-    strcpy(line2, "\t ");
-    if (rt == YL_REP_ON) {
-	line2[1] = '.';
-    }
-    yld_write_control_file(&yldisp_data, "line2", line2);
-}
-
-
-yl_rep_type_t get_yldisp_rep_type()
-{
+yl_store_type_t get_yldisp_store_type() {
   return(0);
 }
 
 
-void set_yldisp_new_type(yl_new_type_t nt)
-{
-    char line2[9];
-
-    strcpy(line2, " ");
-    if (nt == YL_NEW_ON) {
-	line2[0] = '.';
-    }
-    yld_write_control_file(&yldisp_data, "line2", line2);
-}
-
-
-yl_new_type_t get_yldisp_new_type()
-{
-    return (0);
-}
-
-
-void set_yldisp_ringer(yl_ringer_state_t rs)
-{
+void set_yldisp_ringer(yl_ringer_state_t rs) {
   yld_write_control_file(&yldisp_data,
                          (rs == YL_RINGER_ON) ? "show_icon" : "hide_icon",
                          "RINGTONE");
@@ -588,23 +546,7 @@ void set_yldisp_text(char *text) {
   yld_write_control_file(&yldisp_data, "line3", text);
 }
 
-char *get_yldisp_text()
-{
-    return (NULL);
-}
-
-
-void set_yldisp_num(char *num)
-{
-    char line1[18];
-
-    strcpy(line1, "\t\t\t\t\t\t\t\t\t\t\t\t\t\t   ");
-    strncpy(line1 + 14, num, 3);
-    yld_write_control_file(&yldisp_data, "line1", line1);
-}
-
-char *get_yldisp_num()
-{
+char *get_yldisp_text() {
   return(NULL);
 }
 

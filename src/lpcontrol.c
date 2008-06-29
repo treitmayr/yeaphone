@@ -251,10 +251,6 @@ void lpstates_submit_command(lpstates_command_t command, char *arg) {
     case LPCOMMAND_STARTUP:
       linphone_core_init(&(lpstates_data.core_state), lpstates_data.vtable,
                          lpstates_data.configfile_name, &lpstates_data);
-
-      /* we use the ringer on the handset */
-      linphone_core_set_ring(&(lpstates_data.core_state), "/dev/null");
-
       break;
       
     case LPCOMMAND_SHUTDOWN:

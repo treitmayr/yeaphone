@@ -1,6 +1,6 @@
 YeaPhone - a SIP phone for Yealink USB-P1K handsets using liblinphone
 ========
-(c) Copyright 2006 by Thomas Reitmayr (treitmayr@yahoo.com)
+(c) Copyright 2006 by Thomas Reitmayr (treimtayr@yahoo.com)
 Homepage: <http://www.devbase.at/>
 Released under the GNU GENERAL PUBLIC LICENSE v2 or later
 
@@ -157,10 +157,8 @@ can be used to place and receive calls.
 The various keys have the following functions:
 
    1. before a phone call
-          * 0-9,*,#
+          * 0-9
             Dial a phone number
-          * 0-9,*,# pressed long
-            Recall and display a number from memory X
           * C
             Remove the last character of the dialed number
           * C pressed long
@@ -168,17 +166,12 @@ The various keys have the following functions:
           * <red key>
             Remove the complete number
           * <green key>
-            Number already dialed: Initiate the call
-            No number dialed yet: Recall the number of the last call
-          * <green key> pressed long + <0-9>
+            Initiate the call
+          * # + <0-9>
             No number dialed yet: Recall and display a number from
             memory X
             Number already dialed: Store the currently displayed number
             at memory X
-          * UP / DOWN key
-            Cycle through dialled & received calls / memory
-          * UP / DOWN key pressed long
-            Switch to memory display
    2. during a phone call
           * 0-9,*,#
             Generate DTMF tones
@@ -186,6 +179,17 @@ The various keys have the following functions:
             Terminate the call
           * VOL+/-
             Adjust the speaker's volume 
+   3. after a phone call (with the last number displayed)
+          * 0-9
+            Dial a new phone number
+          * C
+            Remove the complete number
+          * <red key>
+            Remove the complete number
+          * <green key>
+            Redial the last number
+          * # + <0-9>
+            Store the last number to memory /X/ 
    4. when the phone rings
           * #
             Mute the ringing without picking up
@@ -197,12 +201,6 @@ The various keys have the following functions:
           * <red key> pressed long
             Start and stop the VoIP connection (corresponds to turning
             on/off a phone) 
-
-The number in the upper right corner of the phone display indicates
-the number of new incoming calls when in normal mode.
-When in memory display mode ("STORE" is displayed in the upper right
-corner) the number indicates the memory position of the number
-displayed.
 
 To correctly understand the phone number of incoming calls, YeaPhone
 needs some adjustments in the file ~/.yeaphonerc. After terminating
