@@ -671,7 +671,7 @@ void start_ylcontrol() {
   /* grab the event device to prevent it from propagating
      its events to the regular keyboard driver            */
   if (ioctl(ylcontrol_data.evfd, EVIOCGRAB, (void *)1)) {
-    perror(strerror(errno));
+    perror("EVIOCGRAB");
     abort();
   }
   
