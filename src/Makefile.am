@@ -1,6 +1,6 @@
 ## Process this file with automake to produce Makefile.in
 
-INCLUDES = @ORTP_CFLAGS@ @LINPHONE_CFLAGS@
+INCLUDES = @LINPHONE_CFLAGS@
 
 # Program binary name
 bin_PROGRAMS = yeaphone
