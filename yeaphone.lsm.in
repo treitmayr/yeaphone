@@ -4,14 +4,16 @@ Version:	@VERSION@
 Entered-date:	@ISODATE@
 Description:	A linphone frontend for external handset devices
 		@configure_input@
-		Please edit yeaphone.lsm.in to fix the Keywords and
-		Primary-site entries, add several more lines of
-		description here if appropriate, and to delete these
-		instructions.
-Keywords:	[substitute your keywords here]
-Author: 	treitmayr@yahoo.com (Thomas Reitmayr)
-Maintained-by:	treitmayr@yahoo.com (Thomas Reitmayr)
-Primary-site:	metlab.unc.edu pub/Linux/apps/some/directory
+    The goal of the Yeaphone project is to provide a user interface on a
+    Yealink USB handset <http://www.yealink.com/en/index.asp> for the VoIP
+    software Linphone thus making a PC keyboard and monitor unneccessary.
+    This makes Yeaphone ideal for "Embedded Devices" which work very energy
+    efficient but typically need an extra devices for user interaction (in
+    this case the handset).
+Keywords:	voip
+Author: 	treitmayr@devbase.at (Thomas Reitmayr)
+Maintained-by:	treitmayr@devbase.at (Thomas Reitmayr)
+Primary-site:	download.devbase.at/voip
 		31k yeaphone-@VERSION@.tar.gz
 		500  yeaphone.lsm
 Alternate-site: 

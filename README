@@ -1,39 +1,41 @@
-YeaPhone - a SIP phone for Yealink USB-P1K handsets using liblinphone
+Yeaphone - a SIP phone for Yealink USB-P1K handsets using liblinphone
 ========
-(c) Copyright 2006 by Thomas Reitmayr (treimtayr@yahoo.com)
-Homepage: <http://www.devbase.at/>
+(c) Copyright 2006-2008 by Thomas Reitmayr <treitmayr@devbase.at>
+Homepage: http://www.devbase.at/
 Released under the GNU GENERAL PUBLIC LICENSE v2 or later
 
-The goal of the YeaPhone project is to bring VoIP-Software together with
-the Yealink USB handset (USB-P1K) <http://www.yealink.com/en/index.asp>
-and at the same time make a PC keyboard and monitor unneccessary. This
-makes YeaPhone ideal for "Embedded Devices" as these do typically need
-extra devices for user interaction (in this case the handset) while
-working very energy efficient. The following descriptions provide
-special support for the Linksys NSLU2
-<http://www.geekly.de/artikel/gadgets/linksys-nslu2.html>.
+The goal of the Yeaphone project is to provide a user interface on a
+Yealink USB handset <http://www.yealink.com/en/index.asp> for the VoIP
+software Linphone thus making a PC keyboard and monitor unneccessary.
+This makes Yeaphone ideal for "Embedded Devices" which work very energy
+efficient but typically need an extra devices for user interaction (in
+this case the handset). Parts of the following description emphasizes
+on the Linksys NSLU2 but the software should work on many Linux-based
+embedded and PC systems.
 
-"/But why not buy one of the commercially available VoIP phones?/", you
-might ask. A few advantages and disadvantages about using YeaPhone on an
+"But why not buy one of the commercially available VoIP phones?", you
+might ask. A few advantages and disadvantages about using Yeaphone on an
 NSLU2 I can think of are:
 
     + The additional costs for NSLU2 owners are relatively low, about
-      30 euro for a Yealink P1K.
-    + In parallel to YeaPhone one can use an Asterisk server with
-      (almost) all of its features, like extensions, configurable
-      answering machine, individual dial plans, call lists, fax
-      reception(?).
+      30 Euro for a Yealink P1K.
+    + No need for an additional box most likely requiring an additional
+      power supply.
+    + In parallel to Yeaphone one can install an Asterisk server on the
+      same box to get features like extensions, configurable answering
+      machine, individual dial plans, call lists.
 
-    - Rather complex procedures for installing the OpenSlug firmware and
+    - Rather complex procedures for installing the SlugOS firmware and
       the applications. Therefore the use on an NSLU2 is recommended for
       experienced Linux users only.
     - Possible interruptions of calls at high network or CPU loads, eg.
       when massivly accessing connected harddrives or other installed
-      services while being on the phone. Note: The QoS issue is not
-      discussed here.
+      services while being on the phone. Note: QoS is not a Yeaphone-
+      specific issue.
+
 
 Features
---------
+========
 
     * Display the phone number of incoming and outgoing calls
     * Show the duration of a call
@@ -42,51 +44,20 @@ Features
     * Adjustable volume of the speaker
     * and more ... 
 
+
 Download & Installation
------------------------
+=======================
 
-*Linksys NSLU2*
+Please check the devbase.at website for availability of binary packages
+for your architecture. There you can also find a tar-ball of the latest
+release of the Yeaphone source code as well as instructions how to
+access the Subversion repository.
 
-The simplest way to install YeaPhone on OpenSlug/SlugOS 3.10b is to use
-the DevBase feed. As the package feed provides already compiled programs
-they might not work with different versions of OpenSlug/SlugOS.
-
-Follow these instructions (als root):
-
-   1. Log into your NSLU2 and add the DevBase feed:
-      # echo "src devbase http://feed.devbase.at/slugos-3.10" >>
-      /etc/ipkg.conf
-   2. Update the package database:
-      # ipkg update
-   3. Install Linphone and YeaPhone:
-      # ipkg install linphonec yeaphone
-   4. Install an updated USB-HID kernel module (includes patch from
-      kernel 2.6.18):
-      # ipkg install -force-reinstall kernel-module-usb-hid 
-
-For developers with a working cross-compile environment the BitBake
-files are provided for compiling Linphone and YeaPhone
-
-BitBake files for OpenSlug/SlugOS  
-<http://download.devbase.at/voip/yeaphone-0.1-bb.tgz>
-
-*Linux-PC*
-
-Currently available are the source code of YeaPhone as well as
-neccessary patches for liblinphone, binary packages are not available at
-this time. Before compilation the patches have to be applied to the
-specified version of Linphone.
-
-Sourcecode for YeaPhone 0.1
-<http://download.devbase.at/voip/yeaphone-0.1.tar.gz>
-Patch Set for Linphone 1.4.1
-<http://download.savannah.nongnu.org/releases/linphone/1.4.x/source/>
-<http://download.devbase.at/voip/linphone-1.4.1-patches.tgz>
 
 Configuration
--------------
+=============
 
-YeaPhone has to be configured through linphonec, the console version
+Yeaphone has to be configured through linphonec, the console version
 of Linphone. The following example shows how to get a working connection
 to a VoIP provider.
 
@@ -124,7 +95,7 @@ Registration on sip:sipgate.at sucessful.
 linphonec>
 
 Using linphonec the VoIP connection can be tested immediately before
-using YeaPhone. The speaker and microphone of the Yealink handset can be
+using Yeaphone. The speaker and microphone of the Yealink handset can be
 used already, commands still have to be entered through the PC keyboard
 though. The most important commands of linphonec are:
 
@@ -150,8 +121,8 @@ Ready
 Registration on sip:sipgate.at sucessful.
 
 At the same time the current date and time are show on the handset's
-display, a quick sequence of status messages appear, and finally the
-lower part of the display should be empty. Now the handset's keyboard
+display, a quick sequence of status messages appears, and finally the
+lower part of the display should be cleared. Now the handset's keyboard
 can be used to place and receive calls.
 
 The various keys have the following functions:
@@ -202,13 +173,20 @@ The various keys have the following functions:
             Start and stop the VoIP connection (corresponds to turning
             on/off a phone) 
 
-To correctly understand the phone number of incoming calls, YeaPhone
+To correctly understand the phone number of incoming calls, Yeaphone
 needs some adjustments in the file ~/.yeaphonerc. After terminating
 yeaphone the parameters intl-access-code, natl-access-code, and
 country-code should be changed accordingly, the default values work for
 Austria only.
 
-Disclaimer:
------------
-The author does not take any responsibility for problems and damage
+For security reasons Yeaphone should not be run as user "root". You
+could create a new group called "voip" on your system and make sure that
+this group is allowed to access the yealink driver interface.
+Example for a udev rule (in file /etc/udev/rules.d/99-yealink.rules):
+KERNEL=="event*", DRIVERS=="yealink", GROUP="users", RUN+="/bin/sh -c '/bin/chgrp users /sys$env{PHYSDEVPATH}/*'"
+
+
+Disclaimer
+==========
+The authors do not take any responsibility for problems and damage
 arising by installing or using this software, use it at your own risk.

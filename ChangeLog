@@ -1,4 +1,10 @@
-2006-09-24  Thomas Reitmayr  <treitmayr@yahoo.com>
+2006-09-24  Thomas Reitmayr  <treitmayr@devbase.at>
 
 	* yeaphone: initial version.
+
+2008-07-09  Thomas Reitmayr  <treitmayr@devbase.at>
+
+  * src/yldisp.c:
+    Added strategies for finding the event device which also work with newer
+    kernel versions.
 

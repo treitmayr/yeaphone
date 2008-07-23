@@ -1,14 +1,8 @@
-URGENT:
--------
-1 Fix the memory leak on the NSLU2!! This might be in one of the
-  libraries used, in which case we would be out of luck for now.
-
-2 use gettimeofday
-
 Future Features:
 ----------------
 * use just one thread for display timing, schedule according to
-  pending time-outs. Resolution <= 50ms (?)
+  pending time-outs. Resolution <= 50ms (?),
+  use gettimeofday
 
 * store the complete SIP URL for last calls and stored calls
 
@@ -30,6 +24,9 @@ Future Features:
 * find out whether it is possible for an outgoing call to
   distinguish between the ringing and the party actually picking up;
   use this to display the correct number of seconds of the call!
-  
-* Nice to have: Include a web server for configuring the
+
+* provide some menu-driven console interface for configuring the
   various features and to present the calls history
+
+* support different Yealink models
+

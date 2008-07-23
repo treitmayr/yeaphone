@@ -51,5 +51,6 @@ AC_FUNC_STAT
 AC_CHECK_FUNCS([select strchr strdup strrchr])
 
 AC_CONFIG_FILES([Makefile
-                 src/Makefile])
+                 src/Makefile
+                 yeaphone.spec])
 AC_OUTPUT
