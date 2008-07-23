@@ -1,6 +1,6 @@
 # yeaphone.spec
 #
-# Copyright (c) 2006 Thomas Reitmayr treitmayr@yahoo.com
+# Copyright (c) 2006-2008 Thomas Reitmayr <treitmayr@devbase.at>
 #
 %define name yeaphone
 %define version @VERSION@
@@ -11,15 +11,15 @@
 Name: %{name}
 Version: %{version}
 Release: %{release}
-Copyright: GPL
+License: GPL
 Group: Application/Misc
 
 # optional items
-#Vendor: Thomas Reitmayr
+Vendor: Thomas Reitmayr
 #Distribution:
 #Icon:
-#URL:
-#Packager: Thomas Reitmayr treitmayr@yahoo.com
+URL: http://www.devbase.at/
+Packager: Thomas Reitmayr <treitmayr@devbase.at>
 
 # source + patches
 Source: %{name}-%{version}.tar.gz
@@ -28,8 +28,8 @@ Source: %{name}-%{version}.tar.gz
 #Patch1:
 
 # RPM info
-#Provides:
-#Requires:
+#Provides: 
+Requires: liblinphone2
 #Conflicts:
 #Prereq:
 
@@ -41,8 +41,12 @@ Summary: A linphone frontend for external handset devices
 %description
 A linphone frontend for external handset devices
 @configure_input@
-Please edit yeaphone.spec.in to add several more lines of description
-here if appropriate, and to delete these instructions.
+The goal of the Yeaphone project is to provide a user interface on a
+Yealink USB handset <http://www.yealink.com/en/index.asp> for the VoIP
+software Linphone thus making a PC keyboard and monitor unneccessary.
+This makes Yeaphone ideal for "Embedded Devices" which work very energy
+efficient but typically need an extra devices for user interaction (in
+this case the handset).
 
 %prep
 %setup -q

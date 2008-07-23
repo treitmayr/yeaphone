@@ -1,10 +1,10 @@
-2006-09-24  Thomas Reitmayr  <treitmayr@yahoo.com>
+2006-09-24  Thomas Reitmayr  <treitmayr@devbase.at>
 
 	* yeaphone: initial version.
 
-2007-06-07  Michael Keller <mikeller@gmail.com>
+2008-07-09  Thomas Reitmayr  <treitmayr@devbase.at>
 
-      * yeaphone-0.1.1: added dialled / received calls list
-      * yeaphone-0.1.1: improved ui
-      * yeaphone-0.1.1: added possibility to lock memory
+  * src/yldisp.c:
+    Added strategies for finding the event device which also work with newer
+    kernel versions.
 

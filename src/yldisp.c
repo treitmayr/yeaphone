@@ -31,7 +31,6 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <sys/stat.h>
 #include <dirent.h>
 #include <pthread.h>
 #include <errno.h>
@@ -46,8 +45,7 @@
 #define NANOSEC 1000000000
 
 const char *YLDISP_DRIVER_BASEDIR = "/sys/bus/usb/drivers/yealink/";
-const char *YLDISP_EVENT_LINKNAME = "input:event";
-const char *YLDISP_INPUT_BASEDIR = "/dev/";
+const char *YLDISP_INPUT_BASE = "/dev/input/event";
 
 typedef enum { YL_COUNTER_OFF, YL_COUNTER_DATE, YL_COUNTER_DURATION }
   yl_counter_state_t;
@@ -67,6 +65,8 @@ typedef struct yldisp_data_s {
   pthread_cond_t *count_cond;
   pthread_mutex_t *count_mutex;
   
+  pthread_mutex_t *file_mutex;
+  
   unsigned int blink_on_time;
   unsigned int blink_off_time;
   
@@ -84,10 +84,81 @@ void *counter_proc(void *arg);
 
 /*****************************************************************/
 
+int exist_dir(const char *dirname) {
+  DIR *dir_handle;
+  int result = 0;
+  
+  dir_handle = opendir(dirname);
+  if (dir_handle) {
+    closedir(dir_handle);
+    result = 1;
+  }
+  return result;
+}
+
+/*****************************************************************/
+
+typedef int (*cmp_dirent) (const char *dirname, void *priv);
+
+char *find_dirent(const char *dirname, cmp_dirent compare, void *priv) {
+  DIR *dir_handle;
+  struct dirent *dirent;
+  char *result = NULL;
+  
+  dir_handle = opendir(dirname);
+  if (!dir_handle) {
+    return NULL;
+  }
+  while (!result && (dirent = readdir(dir_handle))) {
+    if (compare(dirent->d_name, priv)) {
+      result = strdup(dirent->d_name);
+      if (!result) {
+        perror("__FILE__/__LINE__: strdup");
+        abort();
+      }
+    }
+  }
+  closedir(dir_handle);
+  return result;
+}
+
+/*****************************************************************/
+
+char *get_num_ptr(char *s) {
+  /* old link to input class directory found, now deprecated */
+  char *cptr = s;
+  while (*cptr && !isdigit(*cptr))
+    cptr++;
+  return (*cptr) ? cptr : NULL;
+}
+
+/*****************************************************************/
+
+int cmp_devlink(const char *dirname, void *priv) {
+  (void) priv;
+  return (dirname && dirname[0] >= '0' && dirname[0] <= '9');
+}
+
+int cmp_eventlink(const char *dirname, void *priv) {
+  (void) priv;
+  return (dirname &&
+          ((!strncmp(dirname, "event", 5) && isdigit(dirname[5])) ||
+           (!strncmp(dirname, "input:event", 11) && isdigit(dirname[11]))));
+}
+
+int cmp_inputdir(const char *dirname, void *priv) {
+  char *s = (char *) priv;
+  return (dirname && !strncmp(dirname, s, strlen(s)) &&
+          isdigit(dirname[strlen(s)]));
+}
+
 void yldisp_init() {
   DIR *driver_dir;
   struct dirent *driver_dirent;
   char *symlink;
+  char *dirname;
+  int plen;
+  char *evnum;
   struct stat event_stat;
   
   yldisp_data.path_sysfs = NULL;
@@ -107,84 +178,82 @@ void yldisp_init() {
   pthread_mutex_init(yldisp_data.count_mutex, NULL);
   pthread_mutex_lock(yldisp_data.count_mutex);
 
-  driver_dir = opendir(YLDISP_DRIVER_BASEDIR);
-  if (!driver_dir) {
-    perror(YLDISP_DRIVER_BASEDIR);
+  yldisp_data.file_mutex = malloc(sizeof(pthread_mutex_t));
+  pthread_mutex_init(yldisp_data.file_mutex, NULL);
+
+  dirname = find_dirent(YLDISP_DRIVER_BASEDIR, cmp_devlink, NULL);
+  if (!dirname) {
     fprintf(stderr, "Please connect your handset first!\n");
-    exit(1);
+    abort();
   }
-  
-  symlink = NULL;
-  while ((driver_dirent = readdir(driver_dir)) && !symlink) {
-    if (driver_dirent->d_name[0] >= '0' &&
-        driver_dirent->d_name[0] <= '9') {
-      /* assume we found the link when filename starts with a number */
-      int plen = strlen(YLDISP_DRIVER_BASEDIR) +
-                 strlen(driver_dirent->d_name) + 5;
-      symlink = malloc(plen);
-      if (!symlink) {
-        perror("malloc");
-        exit(1);
-      }
-      strcpy(symlink, YLDISP_DRIVER_BASEDIR);
-      strcat(symlink, driver_dirent->d_name);
-      strcat(symlink, "/");
-      yldisp_data.path_sysfs = symlink;
-      if (!yldisp_data.path_sysfs) {
-        perror("__FILE__/__LINE__: strdup");
-        abort();
-      }
-      yldisp_data.path_buf = malloc(plen + 20);
-      if (!yldisp_data.path_buf) {
-        perror("__FILE__/__LINE__: strdup");
-        abort();
-      }
-      /*printf("path_sysfs = %s\n", symlink);*/
-    }
-  }
-  
-  closedir(driver_dir);
-  
+  plen = strlen(YLDISP_DRIVER_BASEDIR) + strlen(dirname) + 10;
+  yldisp_data.path_sysfs = malloc(plen);
   if (!yldisp_data.path_sysfs) {
-    fprintf(stderr, "Could not find device link in directory %s!\n",
-            YLDISP_DRIVER_BASEDIR);
-    exit(1);
+    perror("__FILE__/__LINE__: malloc");
+    abort();
   }
+  strcpy(yldisp_data.path_sysfs, YLDISP_DRIVER_BASEDIR);
+  strcat(yldisp_data.path_sysfs, dirname);
+  strcat(yldisp_data.path_sysfs, "/");
+  free(dirname);
+  printf("path_sysfs = %s\n", yldisp_data.path_sysfs);
   
-  driver_dir = opendir(symlink);
-  if (!driver_dir) {
-    perror(symlink);
-    exit(1);
+  /* allocate buffer for sysfs interface path */
+  yldisp_data.path_buf = malloc(plen + 20);
+  if (!yldisp_data.path_buf) {
+    perror("__FILE__/__LINE__: malloc");
+    abort();
   }
+  strcpy(yldisp_data.path_buf, yldisp_data.path_sysfs);
   
-  symlink = NULL;
-  while ((driver_dirent = readdir(driver_dir)) && !symlink) {
-    if (strncmp(driver_dirent->d_name,
-                YLDISP_EVENT_LINKNAME,
-                strlen(YLDISP_EVENT_LINKNAME)) == 0) {
-      char *colon;
-      strcpy(yldisp_data.path_buf, YLDISP_INPUT_BASEDIR);
-      strcat(yldisp_data.path_buf, driver_dirent->d_name);
-      colon = strrchr(yldisp_data.path_buf, ':');
-      *colon = '/';    /* replace colon with slash */
-      /*printf("path_buf = %s\n", yldisp_data.path_buf);*/
-      yldisp_data.path_event = strdup(yldisp_data.path_buf);
-      if (!yldisp_data.path_event) {
-        perror("strdup");
-        abort();
+  evnum = NULL;
+  symlink = malloc(plen + 50);
+  if (!symlink) {
+    perror("__FILE__/__LINE__: malloc");
+    abort();
+  }
+  strcpy(symlink, yldisp_data.path_sysfs);
+  dirname = find_dirent(symlink, cmp_eventlink, NULL);
+  if (dirname) {
+    evnum = get_num_ptr(dirname);
+  }
+  if (!evnum) {
+    dirname = find_dirent(symlink, cmp_inputdir, "input:input");
+    if (dirname) {
+      strcat(symlink, dirname);
+      free(dirname);
+      dirname = find_dirent(symlink, cmp_eventlink, NULL);
+      if (dirname) {
+        evnum = get_num_ptr(dirname);
       }
-      symlink = yldisp_data.path_event;
     }
   }
-  
-  closedir(driver_dir);
-  
-  if (!yldisp_data.path_event) {
-    fprintf(stderr, "Could not find event link in directory %s!\n",
-            yldisp_data.path_sysfs);
-    exit(1);
+  if (!evnum) {
+    strcat(symlink, "input/");
+    dirname = find_dirent(symlink, cmp_inputdir, "input");
+    if (dirname) {
+      strcat(symlink, dirname);
+      free(dirname);
+      dirname = find_dirent(symlink, cmp_eventlink, NULL);
+      if (dirname) {
+        evnum = get_num_ptr(dirname);
+      }
+    }
   }
-  
+  if (evnum) {
+    yldisp_data.path_event = malloc(strlen(YLDISP_INPUT_BASE) +
+                                    strlen(evnum) + 4);
+    strcpy(yldisp_data.path_event, YLDISP_INPUT_BASE);
+    strcat(yldisp_data.path_event, evnum);
+    free(dirname);
+    printf("path_event = %s\n", yldisp_data.path_event);
+  }
+  else {
+    fprintf(stderr, "Could not find the input event interface via %s!\n",
+            yldisp_data.path_sysfs);
+    abort();
+  }
+
   if (stat(yldisp_data.path_event, &event_stat)) {
     perror(yldisp_data.path_event);
     abort();
@@ -216,26 +285,17 @@ void yldisp_uninit() {
   free(yldisp_data.blink_mutex);
   free(yldisp_data.count_cond);
   free(yldisp_data.count_mutex);
+  if (yldisp_data.file_mutex) {
+    free(yldisp_data.file_mutex);
+    yldisp_data.file_mutex = NULL;
+  }
 
-  /* more to come */
+  /* more to come, eg. free */
   
   yldisp_hide_all();
 }
 
 /*****************************************************************/
-
-int yld_wopen_control_file(yldisp_data_t *yld_ptr, char *control) {
-  int fd;
-  strcpy(yld_ptr->path_buf, yld_ptr->path_sysfs);
-  strcat(yld_ptr->path_buf, control);
-  fd = open(yld_ptr->path_buf, O_WRONLY);
-  if (fd < 0) {
-    perror(yld_ptr->path_buf);
-    abort();
-  }
-  return fd;
-}
-
 
 int yld_write_control_file(yldisp_data_t *yld_ptr,
                            char *control,
@@ -243,23 +303,34 @@ int yld_write_control_file(yldisp_data_t *yld_ptr,
   FILE *fp;
   int res;
   
+  if (yld_ptr->file_mutex) {
+    if (pthread_mutex_lock(yld_ptr->file_mutex) != 0) {
+      perror("__FILE__/__LINE__: pthread_mutex_lock");
+      abort();
+    }
+  }
   strcpy(yld_ptr->path_buf, yld_ptr->path_sysfs);
   strcat(yld_ptr->path_buf, control);
   
   fp = fopen(yld_ptr->path_buf, "w");
-  if (!fp) {
+  if (fp) {
+    res = fputs(line, fp);
+    if (res < 0)
+      perror(yld_ptr->path_buf);
+    fclose(fp);
+  }
+  else {
     perror(yld_ptr->path_buf);
-    return 0;
+    res = -1;
   }
   
-  /*flockfile(fp);*/
-  res = fputs(line, fp);
-  if (res < 0)
-    perror("fputs");
-  /*funlockfile(fp);*/
-  
-  fclose(fp);
-  
+  if (yld_ptr->file_mutex) {
+    if (pthread_mutex_unlock(yld_ptr->file_mutex) != 0) {
+      perror("__FILE__/__LINE__: pthread_mutex_lock");
+      abort();
+    }
+  }
+
   return (res < 0) ? 0 : strlen(line);
 }
 
@@ -371,7 +442,7 @@ void *counter_proc(void *arg) {
   while (1) {
     if (yld_ptr->counter_state == YL_COUNTER_OFF) {
       /* no counting requested yet */
-	    yld_write_control_file(&yldisp_data, "line1", "           ");
+      yld_write_control_file(yld_ptr, "line1", "           \t\t\t   ");
       yld_write_control_file(yld_ptr, "line2", "\t\t       ");
       pthread_cond_wait(yld_ptr->count_cond, yld_ptr->count_mutex);
       init = 1;
@@ -410,13 +481,9 @@ void *counter_proc(void *arg) {
         yld_write_control_file(yld_ptr, "line2", line2);
       }
       
-	    sprintf(line1, "%2d.%2d.%2d.%02d",
-		    tms->tm_mon + 1, tms->tm_mday, tms->tm_hour,
-		    tms->tm_min);
-	    yld_write_control_file(yld_ptr, "line1", line1);
-
-	    usleep(500000);
-	    line1[8] = ' ';
+      sprintf(line1, "%2d.%2d.%2d.%02d\t\t\t %02d",
+              tms->tm_mon + 1, tms->tm_mday,
+              tms->tm_hour, tms->tm_min, tms->tm_sec);
       yld_write_control_file(yld_ptr, "line1", line1);
       
       abstime.tv_sec++;
@@ -443,7 +510,7 @@ void *counter_proc(void *arg) {
           m -= h * 60;
         }
       }
-	    sprintf(line1, "   %2d %2d.%02d", h, m, s);
+      sprintf(line1, "      %2d.%02d\t\t\t %02d", h, m, s);
       yld_write_control_file(yld_ptr, "line1", line1);
       
       abstime.tv_sec++;
@@ -525,50 +592,12 @@ void set_yldisp_store_type(yl_store_type_t st) {
 }
 
 
-yl_store_type_t get_yldisp_store_type()
-{
-    return (0);
-}
-
-
-void set_yldisp_rep_type(yl_rep_type_t rt)
-{
-    char line2[9];
-
-    strcpy(line2, "\t ");
-    if (rt == YL_REP_ON) {
-	line2[1] = '.';
-    }
-    yld_write_control_file(&yldisp_data, "line2", line2);
-}
-
-
-yl_rep_type_t get_yldisp_rep_type()
-{
+yl_store_type_t get_yldisp_store_type() {
   return(0);
 }
 
 
-void set_yldisp_new_type(yl_new_type_t nt)
-{
-    char line2[9];
-
-    strcpy(line2, " ");
-    if (nt == YL_NEW_ON) {
-	line2[0] = '.';
-    }
-    yld_write_control_file(&yldisp_data, "line2", line2);
-}
-
-
-yl_new_type_t get_yldisp_new_type()
-{
-    return (0);
-}
-
-
-void set_yldisp_ringer(yl_ringer_state_t rs)
-{
+void set_yldisp_ringer(yl_ringer_state_t rs) {
   yld_write_control_file(&yldisp_data,
                          (rs == YL_RINGER_ON) ? "show_icon" : "hide_icon",
                          "RINGTONE");
@@ -588,23 +617,7 @@ void set_yldisp_text(char *text) {
   yld_write_control_file(&yldisp_data, "line3", text);
 }
 
-char *get_yldisp_text()
-{
-    return (NULL);
-}
-
-
-void set_yldisp_num(char *num)
-{
-    char line1[18];
-
-    strcpy(line1, "\t\t\t\t\t\t\t\t\t\t\t\t\t\t   ");
-    strncpy(line1 + 14, num, 3);
-    yld_write_control_file(&yldisp_data, "line1", line1);
-}
-
-char *get_yldisp_num()
-{
+char *get_yldisp_text() {
   return(NULL);
 }
 

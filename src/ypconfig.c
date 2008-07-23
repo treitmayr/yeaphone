@@ -34,7 +34,7 @@
 #endif
 
 
-#define MAX_LINE_LEN 256
+#define YP_MAX_LINE_LEN 256
 
 typedef struct yc_dll_s {
   char *key;
@@ -73,6 +73,10 @@ int ypconfig_read(const char *fname) {
     if (ypconfig_fname)
       free(ypconfig_fname);
     ypconfig_fname = strdup(fname);
+    if (!ypconfig_fname) {
+      perror("__FILE__/__LINE__: strdup");
+      abort();
+    }
   }
   else {
     /* try to use a previously specified file name */
@@ -88,41 +92,46 @@ int ypconfig_read(const char *fname) {
   
   /* deallocate any existing dll-nodes */
   yc_dll_destroy();
-  
-  linebuf = malloc(MAX_LINE_LEN);
+
   current = &yl_dll_root;
-  
-  while (fgets(linebuf, MAX_LINE_LEN, fp)) {
+  linebuf = malloc(YP_MAX_LINE_LEN);
+  if (!linebuf) {
+    perror("__FILE__/__LINE__: malloc");
+    abort();
+  }
+
+  while (fgets(linebuf, YP_MAX_LINE_LEN, fp)) {
     char *cp;
     int cnt;
     
     /* remove trailing white space */
     if (*linebuf) {
       cp = linebuf + strlen(linebuf) - 1;
-      while (*cp <= ' ')
+      while ((cp >= linebuf) && (*cp <= ' '))
         *cp-- = '\0';
     }
     
-    /* get the key part */
+    /* get the key part by skipping any leading spaces */
     key = linebuf;
     while (*key && *key <= ' ')
       key++;
-    if (!*key)
+    if (!*key || (*key == '#'))
       continue;
     
+    /* find the end of the key word */
     cp = key + 1;
     while (*cp && *cp > ' ')
       cp++;
     
-    val = (cp) ? cp+1 : cp;
-    *cp = '\0';
+    val = (*cp) ? cp+1 : cp;
+    *cp = '\0';                 /* cut off the key word */
     
-    /* get the value part */
-    /* TODO: handle escaped characters, eg. \" */
+    /* get the value part by skipping any leading spaces */
     while (*val && (*val <= ' ' || *val == '='))
       val++;
     
     /* check if it is a quoted string */
+    /* TODO: handle escaped characters, eg. \" */
     cnt = strlen(val) - 1;
     if ((cnt > 0) &&
         ((val[0] == '"' && val[cnt] == '"') ||
@@ -133,6 +142,7 @@ int ypconfig_read(const char *fname) {
     }
     
     /* add to linked list */
+    /* TODO: check return value of malloc & strdup */
     *current = malloc(sizeof(yc_dll_t));
     (*current)->key = strdup(key);
     (*current)->val = strdup(val);
@@ -150,13 +160,12 @@ int ypconfig_read(const char *fname) {
 
 
 char *ypconfig_get_value(const char *key) {
-  yc_dll_t **current;
-  current = &yl_dll_root;
+  yc_dll_t *current = yl_dll_root;
   
-  while (*current) {
-    if (!strcmp((*current)->key, key))
-      return (*current)->val;
-    current = &((*current)->next);
+  while (current) {
+    if (!strcmp(current->key, key))
+      return current->val;
+    current = current->next;
   }
   return NULL;
 }
@@ -187,7 +196,7 @@ void ypconfig_set_pair(const char *key, const char *value) {
 
 int ypconfig_write(char *fname) {
   FILE *fp;
-  yc_dll_t **current;
+  yc_dll_t *current;
   char *val;
   int num = 0;
   
@@ -209,11 +218,11 @@ int ypconfig_write(char *fname) {
     return -1;
   }
   
-  current = &yl_dll_root;
+  current = yl_dll_root;
   
-  while (*current) {
-    fputs((*current)->key, fp);
-    val = (*current)->val;
+  while (current) {
+    fputs(current->key, fp);
+    val = current->val;
     if ((val[0] == '=') || strchr(val, ' ') || strchr(val, '\t')) {
       fputs("\t\"", fp);
       fputs(val, fp);
@@ -224,7 +233,7 @@ int ypconfig_write(char *fname) {
       fputs(val, fp);
       fputs("\n", fp);
     }
-    current = &((*current)->next);
+    current = current->next;
     num++;
   }
   

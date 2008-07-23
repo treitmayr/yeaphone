@@ -46,13 +46,6 @@
 
 #define MAX_NUMBER_LEN 32
 
-#define DIALBACK_LEN 10
-
-typedef struct ylc_number_s {
-    char num[MAX_NUMBER_LEN];
-    yl_call_type_t type;
-    int new_num;
-} ylc_number_t;
 
 typedef struct ylcontrol_data_s {
   int evfd;
@@ -63,17 +56,9 @@ typedef struct ylcontrol_data_s {
   int prep_store;
   int prep_recall;
   
-  int mem_pos;
-  yl_call_type_t type;
-  int new_num;
-  int new_count;
-
-  ylc_number_t fifo[DIALBACK_LEN];
-  int fifo_size;
-  int fifo_pos;
-
   char dialnum[MAX_NUMBER_LEN];
   char callernum[MAX_NUMBER_LEN];
+  char dialback[MAX_NUMBER_LEN];
   
   char *intl_access_code;
   char *country_code;
@@ -86,13 +71,9 @@ ylcontrol_data_t ylcontrol_data;
 
 /*****************************************************************/
 
-void display_dialnum(char *num, int disp_unknown)
-{
+void display_dialnum(char *num) {
   int len = strlen(num);
-    if (!len && disp_unknown) {
-      /* unknown caller */
-      set_yldisp_text(" - - -      ");
-    } else if (len < 12) {
+  if (len < 12) {
     char buf[13];
     strcpy(buf, "            ");
     strncpy(buf, num, len);
@@ -129,6 +110,7 @@ void extract_callernum(ylcontrol_data_t *ylc_ptr, const char *line) {
       what++;
       
       if (num && num[0]) {
+        /*printf("trying %s\n", num);*/
         
         /* remove surrounding quotes */
         if (num[0] == '"' && num[strlen(num) - 1] == '"') {
@@ -202,161 +184,7 @@ void extract_callernum(ylcontrol_data_t *ylc_ptr, const char *line) {
 
 /**********************************/
 
-void prep_mem(ylcontrol_data_t * ylc_ptr)
-{
-  if (strlen(ylc_ptr->dialnum) > 0) {
-    /* prepare to store the currently displayed number */
-    char *key;
-    char *val;
-    key = strdup("mem-locked");
-    val = ypconfig_get_value(key);
-    if (strcmp(val, "true")) {
-        ylc_ptr->prep_store = 1;
-        set_yldisp_text("   store    ");
-    } else {
-        set_yldisp_text("   locked   ");
-    }
-    free(key);
-  } else {
-    /* prepare to recall a number */
-    ylc_ptr->prep_recall = 1;
-    set_yldisp_text("  select    ");
-  }
-}
-
-
-void store_mem(ylcontrol_data_t * ylc_ptr, yl_call_type_t type,
-               int new_num)
-{
-  ylc_number_t *ylc_num;
-  if ((ylc_ptr->mem_pos >= '0') && (ylc_ptr->mem_pos <= '9')) {
-    char *key;
-    key = strdup("mem ");
-    key[3] = ylc_ptr->mem_pos;
-    ypconfig_set_pair(key, ylc_ptr->dialnum);
-    free(key);
-    ypconfig_write(NULL);
-  } else {
-    ylc_num = &(ylc_ptr->fifo[ylc_ptr->fifo_pos]);
-    strncpy(ylc_num->num, ylc_ptr->dialnum, MAX_NUMBER_LEN);
-    ylc_num->type = type;
-    ylc_num->new_num = new_num;
-    if (new_num) {
-        ylc_ptr->new_count++;
-    }
-    ylc_ptr->fifo_pos = (ylc_ptr->fifo_pos++) % DIALBACK_LEN;
-    if (ylc_ptr->fifo_size < DIALBACK_LEN) {
-        ylc_ptr->fifo_size++;
-    }
-  }
-}
-
-
-int get_mem(ylcontrol_data_t * ylc_ptr)
-{
-  int result = 0;
-  if ((ylc_ptr->mem_pos >= '0') && (ylc_ptr->mem_pos <= '9')) {
-    char *key;
-    char *val = NULL;
-    key = strdup("mem ");
-    key[3] = ylc_ptr->mem_pos;
-    val = ypconfig_get_value(key);
-    if (val && *val) {
-        strncpy(ylc_ptr->dialnum, val, MAX_NUMBER_LEN);
-        result = 1;
-    }
-    free(key);
-  } else if ((ylc_ptr->mem_pos >= 0)
-           && (ylc_ptr->mem_pos < ylc_ptr->fifo_size)) {
-    ylc_number_t *ylc_num;
-    ylc_num =
-        &(ylc_ptr->
-          fifo[((ylc_ptr->fifo_pos - 1) -
-                ylc_ptr->mem_pos) % DIALBACK_LEN]);
-    strcpy(ylc_ptr->dialnum, ylc_num->num);
-    ylc_ptr->type = ylc_num->type;
-    ylc_ptr->new_num = ylc_num->new_num;
-    if (ylc_num->new_num) {
-        ylc_ptr->new_count--;
-        ylc_num->new_num = 0;
-    }
-    result = 2;
-  }
-  return result;
-}
-
-
-void display_memnum(char num)
-{
-  char buf[4];
-  strcpy(buf, "   ");
-  buf[2] = num;
-  set_yldisp_num(buf);
-}
-
-
-void display_newcount(int count)
-{
-  char buf[4];
-  sprintf(buf, "%3d", count);
-  set_yldisp_num(buf);
-}
-
-
-void cycle(ylcontrol_data_t * ylc_ptr, int lowest, int highest, int step)
-{
-  int i = highest - lowest;
-  int found = 0;
-  while ((i > 0) && (!found)) {
-    if ((step > 0)
-        && ((ylc_ptr->mem_pos < lowest)
-            || (ylc_ptr->mem_pos >= highest))) {
-        ylc_ptr->mem_pos = lowest;
-    } else if ((step < 0)
-               && ((ylc_ptr->mem_pos <= lowest)
-                   || (ylc_ptr->mem_pos > highest))) {
-        ylc_ptr->mem_pos = highest;
-    } else {
-        ylc_ptr->mem_pos += step;
-    }
-    found = get_mem(ylc_ptr);
-    i--;
-  }
-}
-
-
-void display_number_unknown(ylcontrol_data_t * ylc_ptr, int disp_unknown)
-{
-  if ((ylc_ptr->mem_pos >= '0') && (ylc_ptr->mem_pos <= '9')) {
-    set_yldisp_call_type(YL_CALL_NONE);
-    set_yldisp_new_type(YL_NEW_NONE);
-    set_yldisp_store_type(YL_STORE_ON);
-    display_dialnum(ylc_ptr->dialnum, 1);
-    display_memnum(ylc_ptr->mem_pos);
-  } else if ((ylc_ptr->mem_pos >= 0)
-           && (ylc_ptr->mem_pos <= DIALBACK_LEN - 1)) {
-    set_yldisp_call_type(ylc_ptr->type);
-    set_yldisp_new_type(ylc_ptr->new_num ? YL_NEW_ON : YL_NEW_NONE);
-    set_yldisp_store_type(YL_STORE_NONE);
-    display_dialnum(ylc_ptr->dialnum, 1);
-    display_newcount(ylc_ptr->new_count);
-  } else {
-    set_yldisp_call_type(YL_CALL_NONE);
-    set_yldisp_new_type(YL_NEW_NONE);
-    set_yldisp_store_type(YL_STORE_NONE);
-    display_dialnum(ylc_ptr->dialnum, disp_unknown);
-    display_newcount(ylc_ptr->new_count);
-  }
-}
-
-void display_number(ylcontrol_data_t * ylc_ptr)
-{
-  display_number_unknown(ylc_ptr, 0);
-}
-
-
-void handle_key(ylcontrol_data_t * ylc_ptr, int code, int value)
-{
+void handle_key(ylcontrol_data_t *ylc_ptr, int code, int value) {
   char c;
   gstate_t lpstate_power;
   gstate_t lpstate_call;
@@ -366,14 +194,15 @@ void handle_key(ylcontrol_data_t * ylc_ptr, int code, int value)
   lpstate_call = gstate_get_state(GSTATE_GROUP_CALL);
   lpstate_reg = gstate_get_state(GSTATE_GROUP_REG);
   
-/*  printf("key=%d value=%d\n", code, value);*/
   if (code == 42) {     /* left shift */
     ylc_ptr->kshift = value;
     ylc_ptr->pressed = -1;
-    } else {
-      if (!value) {
-/*      printf("key handled=%d\n", ylc_ptr->pressed);*/
-        switch (ylc_ptr->pressed) {
+  }
+  else {
+    ylc_ptr->pressed = (value) ? code : -1;
+    if (value) {
+      /*printf("key=%d\n", code);*/
+      switch (code) {
         case 2:       /* '1'..'9' */
         case 3:
         case 4:
@@ -388,33 +217,67 @@ void handle_key(ylcontrol_data_t * ylc_ptr, int code, int value)
           if (lpstate_power != GSTATE_POWER_ON)
             break;
           /* get the real character */
-          c = (ylc_ptr->pressed == 55) ? '*' :
-                (ylc_ptr->pressed == 4 && ylc_ptr->kshift) ? '#' :
-                (ylc_ptr->pressed ==
-                  11) ? '0' : ('0' + ylc_ptr->pressed - 1);
+          c = (code == 55) ? '*' :
+              (code == 4 && ylc_ptr->kshift) ? '#' :
+              (code == 11) ? '0' : ('0' + code - 1);
 
           if (lpstate_call == GSTATE_CALL_IDLE &&
               lpstate_reg  == GSTATE_REG_OK) {
+            int len = strlen(ylc_ptr->dialnum);
             
+            if (c == '#') {
+              /* the store/recall character */
+              if ((len > 0) || ylc_ptr->dialback[0]) {
+                /* prepare to store the currently displayed number */
+                ylc_ptr->prep_store = 1;
+                set_yldisp_store_type(YL_STORE_ON);
+              }
+              else {
+                /* prepare to recall a number */
+                ylc_ptr->prep_recall = 1;
+                set_yldisp_text("  select    ");
+              }
+            }
+            else
+            if (c >= '0' && c <= '9') {
               if (ylc_ptr->prep_store) {
-			ylc_ptr->mem_pos = c;
-			store_mem(ylc_ptr, YL_CALL_NONE, 0);
-			set_yldisp_text("  stored    ");
+                /* store number */
+                char *key;
+                key = strdup("mem ");
+                key[3] = c;
+                ypconfig_set_pair(key, (len) ? ylc_ptr->dialnum : ylc_ptr->dialback);
+                free(key);
+                ypconfig_write(NULL);
                 ylc_ptr->prep_store = 0;
-		    } else if (ylc_ptr->prep_recall) {
-			ylc_ptr->mem_pos = c;
-			get_mem(ylc_ptr);
-			display_number(ylc_ptr);
+                set_yldisp_store_type(YL_STORE_NONE);
+              }
+              else
+              if (ylc_ptr->prep_recall) {
+                /* recall number but do not dial yet */
+                char *key;
+                char *val;
+                key = strdup("mem ");
+                key[3] = c;
+                val = ypconfig_get_value(key);
+                if (val && *val) {
+                  strncpy(ylc_ptr->dialback, val, MAX_NUMBER_LEN);
+                }
+                free(key);
                 ylc_ptr->prep_recall = 0;
-		    } else {
-			int len = strlen(ylc_ptr->dialnum);
+                display_dialnum(ylc_ptr->dialback);
+              }
+              else {
                 /* we want to dial for an outgoing call */
                 if (len + 1 < sizeof(ylc_ptr->dialnum)) {
                   ylc_ptr->dialnum[len + 1] = '\0';
                   ylc_ptr->dialnum[len] = c;
+                  display_dialnum(ylc_ptr->dialnum);
+                }
+                ylc_ptr->dialback[0] = '\0';
+              }
             }
-			ylc_ptr->mem_pos = -1;
-			display_number(ylc_ptr);
+            else {
+              /* do not handle '*' for now ... */
             }
           }
           else
@@ -435,17 +298,22 @@ void handle_key(ylcontrol_data_t * ylc_ptr, int code, int value)
         case 14:         /* C */
           if (lpstate_power != GSTATE_POWER_ON)
             break;
+          if (lpstate_call == GSTATE_CALL_IDLE &&
+              lpstate_reg  == GSTATE_REG_OK) {
             int len = strlen(ylc_ptr->dialnum);
             if (ylc_ptr->prep_store) {
               ylc_ptr->prep_store = 0;
-		} else {
+              set_yldisp_store_type(YL_STORE_NONE);
+            }
+            else {
               if (len > 0) {
                 ylc_ptr->dialnum[len - 1] = '\0';
               }
+              ylc_ptr->dialback[0] = '\0';
               ylc_ptr->prep_recall = 0;
+              display_dialnum(ylc_ptr->dialnum);
+            }
           }
-		ylc_ptr->mem_pos = -1;
-		display_number(ylc_ptr);
           break;
 
         case 28:         /* pick up */
@@ -453,22 +321,25 @@ void handle_key(ylcontrol_data_t * ylc_ptr, int code, int value)
             break;
           if (lpstate_call == GSTATE_CALL_IDLE &&
               lpstate_reg  == GSTATE_REG_OK) {
+            if (strlen(ylc_ptr->dialnum) == 0 &&
+                strlen(ylc_ptr->dialback) > 0) {
+              /* dial the current number displayed */
+              strcpy(ylc_ptr->dialnum, ylc_ptr->dialback);
+            }
             if (strlen(ylc_ptr->dialnum) > 0) {
-			lpstates_submit_command(LPCOMMAND_CALL,
-						ylc_ptr->dialnum);
+              strcpy(ylc_ptr->dialback, ylc_ptr->dialnum);
+              lpstates_submit_command(LPCOMMAND_CALL, ylc_ptr->dialnum);
               
-			ylc_ptr->mem_pos = -1;
-			store_mem(ylc_ptr, YL_CALL_OUT, 0);
+              /* TODO: add number to history */
               
               ylc_ptr->dialnum[0] = '\0';
-			ylc_ptr->mem_pos = -1;
-			display_number(ylc_ptr);
-		    } else {
-			ylc_ptr->mem_pos = 0;
-			get_mem(ylc_ptr);
-			display_number(ylc_ptr);
             }
-		} else if (lpstate_call == GSTATE_CALL_IN_INVITE) {
+            else {
+              /* TODO: display history */
+            }
+          }
+          else
+          if (lpstate_call == GSTATE_CALL_IN_INVITE) {
             lpstates_submit_command(LPCOMMAND_PICKUP, NULL);
           }
           break;
@@ -486,10 +357,11 @@ void handle_key(ylcontrol_data_t * ylc_ptr, int code, int value)
           if (lpstate_call == GSTATE_CALL_IDLE &&
               lpstate_reg  == GSTATE_REG_OK) {
             ylc_ptr->dialnum[0] = '\0';
+            ylc_ptr->dialback[0] = '\0';
             ylc_ptr->prep_store = 0;
             ylc_ptr->prep_recall = 0;
-		    ylc_ptr->mem_pos = -1;
-		    display_number(ylc_ptr);
+            set_yldisp_store_type(YL_STORE_NONE);
+            display_dialnum("");
           }
           break;
         
@@ -518,86 +390,34 @@ void handle_key(ylcontrol_data_t * ylc_ptr, int code, int value)
           break;
         
         case 103:        /* UP */
-		if (lpstate_power != GSTATE_POWER_ON)
-		    break;
-		if ((ylc_ptr->mem_pos >= '0') && (ylc_ptr->mem_pos <= '9')) {
-		    cycle(ylc_ptr, '0', '9', 1);
-		} else {
-		    cycle(ylc_ptr, 0, DIALBACK_LEN - 1, 1);
-		}
-		display_number(ylc_ptr);
           break;
         
         case 108:        /* DOWN */
-		if (lpstate_power != GSTATE_POWER_ON)
-		    break;
-		if ((ylc_ptr->mem_pos >= '0') && (ylc_ptr->mem_pos <= '9')) {
-		    cycle(ylc_ptr, '0', '9', -1);
-		} else {
-		    cycle(ylc_ptr, 0, DIALBACK_LEN - 1, -1);
-		}
-		display_number(ylc_ptr);
           break;
         
         default:
           break;
       }
     }
-	ylc_ptr->pressed = (value) ? code : -1;
   }
 }
 
 /**********************************/
 
-void handle_long_key(ylcontrol_data_t * ylc_ptr, int code)
-{
-    char c;
-
+void handle_long_key(ylcontrol_data_t *ylc_ptr, int code) {
   gstate_t lpstate_power;
   gstate_t lpstate_call;
-    gstate_t lpstate_reg;
   
   lpstate_power = gstate_get_state(GSTATE_GROUP_POWER);
   lpstate_call = gstate_get_state(GSTATE_GROUP_CALL);
-    lpstate_reg = gstate_get_state(GSTATE_GROUP_REG);
   
   switch (code) {
-    case 2:			/* '1'..'9' */
-    case 3:
-    case 4:
-    case 5:
-    case 6:
-    case 7:
-    case 8:
-    case 9:
-    case 10:
-    case 11:			/* '0' */
-    case 55:			/* '*' */
-	if (lpstate_power != GSTATE_POWER_ON)
-	    break;
-	/* get the real character */
-	c = (ylc_ptr->pressed == 55) ? '*' :
-	    (ylc_ptr->pressed == 4 && ylc_ptr->kshift) ? '#' :
-	    (ylc_ptr->pressed == 11) ? '0' : ('0' + ylc_ptr->pressed - 1);
-	ylc_ptr->mem_pos = c;
-	get_mem(ylc_ptr);
-	display_number(ylc_ptr);
-	break;
-
     case 14:         /* C */
       if (lpstate_power != GSTATE_POWER_ON)
         break;
       if (lpstate_call == GSTATE_CALL_IDLE) {
         ylcontrol_data.dialnum[0] = '\0';
-	    ylc_ptr->mem_pos = -1;
-	    display_number(ylc_ptr);
-	}
-	break;
-
-    case 28:			/* pick up */
-	if (lpstate_call == GSTATE_CALL_IDLE
-	    && lpstate_reg == GSTATE_REG_OK) {
-	    prep_mem(ylc_ptr);
+        display_dialnum("");
       }
       break;
     
@@ -612,18 +432,6 @@ void handle_long_key(ylcontrol_data_t * ylc_ptr, int code)
       }
       break;
     
-    case 103:			/* UP */
-	if (lpstate_power != GSTATE_POWER_ON)
-	    break;
-	cycle(ylc_ptr, '0', '9', 1);
-	display_number(ylc_ptr);
-	break;
-
-    case 108:			/* DOWN */
-	if (lpstate_power != GSTATE_POWER_ON)
-	    break;
-	cycle(ylc_ptr, '0', '9', -1);
-	display_number(ylc_ptr);
     default:
       break;
   }
@@ -641,9 +449,6 @@ void lps_callback(struct _LinphoneCore *lc,
   lpstate_call = gstate_get_state(GSTATE_GROUP_CALL);
   lpstate_reg = gstate_get_state(GSTATE_GROUP_REG);
   
-/*  printf("linphone: %i -> %i: %s\n", gstate->old_state, gstate->new_state, gstate->message);*/
-
-    if (gstate->new_state != gstate->old_state) {
   switch (gstate->new_state) {
     case GSTATE_POWER_OFF:
       yldisp_led_off();
@@ -666,8 +471,8 @@ void lps_callback(struct _LinphoneCore *lc,
         break;
       if (lpstate_call == GSTATE_CALL_IDLE) {
         set_yldisp_text("-reg failed-");
+        ylcontrol_data.dialback[0] = '\0';
         ylcontrol_data.dialnum[0] = '\0';
-		ylcontrol_data.mem_pos = -1;
         yldisp_led_blink(150, 150);
       }
       break;
@@ -682,8 +487,9 @@ void lps_callback(struct _LinphoneCore *lc,
       if (lpstate_power != GSTATE_POWER_ON)
         break;
       if (lpstate_call == GSTATE_CALL_IDLE) {
+        display_dialnum("");
+        ylcontrol_data.dialback[0] = '\0';
         ylcontrol_data.dialnum[0] = '\0';
-		ylcontrol_data.mem_pos = -1;
         yldisp_led_on();
       }
       break;
@@ -693,8 +499,8 @@ void lps_callback(struct _LinphoneCore *lc,
         break;
       if (lpstate_reg == GSTATE_REG_FAILED) {
         set_yldisp_text("-reg failed-");
+        ylcontrol_data.dialback[0] = '\0';
         ylcontrol_data.dialnum[0] = '\0';
-		ylcontrol_data.mem_pos = -1;
         yldisp_led_blink(150, 150);
       }
       else if (lpstate_reg == GSTATE_REG_OK) {
@@ -704,13 +510,10 @@ void lps_callback(struct _LinphoneCore *lc,
       
     case GSTATE_CALL_IN_INVITE:
       extract_callernum(&ylcontrol_data, gstate->message);
-
-/*        printf("number=%s\n", ylcontrol_data.callernum);*/
-
-	    strcpy(ylcontrol_data.dialnum, ylcontrol_data.callernum);
-	    ylcontrol_data.mem_pos = -1;
-	    store_mem(&ylcontrol_data, YL_CALL_IN, 1);
-	    display_number_unknown(&ylcontrol_data, 1);
+      if (strlen(ylcontrol_data.callernum))
+        display_dialnum(ylcontrol_data.callernum);
+      else
+        display_dialnum(" - - -");
       
       set_yldisp_call_type(YL_CALL_IN);
       yldisp_led_blink(300, 300);
@@ -720,6 +523,9 @@ void lps_callback(struct _LinphoneCore *lc,
        * This seems to be a limitation of the hardware */
       usleep(170000);
       set_yldisp_ringer(YL_RINGER_ON);
+      
+      strcpy(ylcontrol_data.dialback, ylcontrol_data.callernum);
+      ylcontrol_data.dialnum[0] = '\0';
       break;
       
     case GSTATE_CALL_IN_CONNECTED:
@@ -746,24 +552,20 @@ void lps_callback(struct _LinphoneCore *lc,
       set_yldisp_ringer(YL_RINGER_OFF);
       set_yldisp_call_type(YL_CALL_NONE);
       yldisp_show_date();
-	    display_number(&ylcontrol_data);
       yldisp_led_on();
       break;
       
     case GSTATE_CALL_ERROR:
-	    ylcontrol_data.dialnum[0] = '\0';
-	    ylcontrol_data.mem_pos = -1;
+      ylcontrol_data.dialback[0] = '\0';
       set_yldisp_call_type(YL_CALL_NONE);
       set_yldisp_text(" - error -  ");
       yldisp_show_date();
       yldisp_led_on();
-/*      printf("error");*/
       break;
       
     default:
       break;
   }
-}
 }
 
 /**********************************/
@@ -782,14 +584,9 @@ void *control_proc(void *arg) {
   
   ylc_ptr->kshift = 0;
   ylc_ptr->dialnum[0] = '\0';
+  ylc_ptr->dialback[0] = '\0';
   ylc_ptr->prep_store = 0;
   ylc_ptr->prep_recall = 0;
-    ylc_ptr->mem_pos = -1;
-    ylc_ptr->type = YL_CALL_NONE;
-    ylc_ptr->new_num = 0;
-    ylc_ptr->new_count = 0;
-    ylc_ptr->fifo_size = 0;
-    ylc_ptr->fifo_pos = 0;
   
   while (1) {
     int retval;
@@ -852,10 +649,6 @@ void init_ylcontrol(char *countrycode) {
     ypconfig_set_pair("country-code", ylcontrol_data.country_code);
     modified = 1;
   }
-    if (!ypconfig_get_value("mem-locked")) {
-	ypconfig_set_pair("mem-locked", "false");
-	modified = 1;
-    }
   if (modified) {
     /* write back modified configuration */
     ypconfig_write(NULL);
@@ -878,7 +671,7 @@ void start_ylcontrol() {
   /* grab the event device to prevent it from propagating
      its events to the regular keyboard driver            */
   if (ioctl(ylcontrol_data.evfd, EVIOCGRAB, (void *)1)) {
-    perror(strerror(errno));
+    perror("EVIOCGRAB");
     abort();
   }
   
