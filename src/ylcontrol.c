@@ -499,7 +499,6 @@ void lps_callback(struct _LinphoneCore *lc,
         break;
       if (lpstate_reg == GSTATE_REG_FAILED) {
         set_yldisp_text("-reg failed-");
-        ylcontrol_data.dialback[0] = '\0';
         ylcontrol_data.dialnum[0] = '\0';
         yldisp_led_blink(150, 150);
       }
