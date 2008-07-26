@@ -297,6 +297,46 @@ void yldisp_uninit() {
 
 /*****************************************************************/
 
+int yld_write_control_file_bin(yldisp_data_t *yld_ptr,
+                               char *control,
+                               char *buf,
+                               int size) {
+  FILE *fp;
+  int res;
+  
+  if (yld_ptr->file_mutex) {
+    if (pthread_mutex_lock(yld_ptr->file_mutex) != 0) {
+      perror("__FILE__/__LINE__: pthread_mutex_lock");
+      abort();
+    }
+  }
+  strcpy(yld_ptr->path_buf, yld_ptr->path_sysfs);
+  strcat(yld_ptr->path_buf, control);
+  
+  fp = fopen(yld_ptr->path_buf, "wb");
+  if (fp) {
+    res = fwrite(buf, 1, size, fp);
+    if (res < size)
+      perror(yld_ptr->path_buf);
+    fclose(fp);
+  }
+  else {
+    perror(yld_ptr->path_buf);
+    res = -1;
+  }
+  
+  if (yld_ptr->file_mutex) {
+    if (pthread_mutex_unlock(yld_ptr->file_mutex) != 0) {
+      perror("__FILE__/__LINE__: pthread_mutex_lock");
+      abort();
+    }
+  }
+
+  return (res < 0) ? 0 : res;
+}
+
+/*****************************************************************/
+
 int yld_write_control_file(yldisp_data_t *yld_ptr,
                            char *control,
                            char *line) {
@@ -594,6 +634,60 @@ void set_yldisp_store_type(yl_store_type_t st) {
 
 yl_store_type_t get_yldisp_store_type() {
   return(0);
+}
+
+
+#define RINGTONE_MAXLEN 256
+#define RING_DIR ".yeaphone/ringtone"
+void set_yldisp_set_ringtone(char *ringname, unsigned char volume)
+{
+  int fd_in;
+  unsigned char ringtone[RINGTONE_MAXLEN];
+  int len = 0;
+  char *ringfile;
+  char *home;
+
+  home = getenv("HOME");
+  if (home) {
+    len = strlen(home) + strlen(RING_DIR) + strlen(ringname) + 3;
+    ringfile = malloc(len);
+    strcpy(ringfile, home);
+    strcat(ringfile, "/"RING_DIR"/");
+    strcat(ringfile, ringname);
+  } else {
+    len = strlen(ringname) + 1;
+    ringfile = malloc(len);
+    strcpy(ringfile, ringname);
+  }
+
+  /* read binary file (replacing first byte with volume)
+  ** and write to ringtone control file
+  ** TODO: track changes - if unchanged, don't set it again
+  ** (write to current.ring file)
+  */
+  fd_in = open(ringfile, O_RDONLY);
+  if (fd_in >= 0)
+  {
+    len = read(fd_in, ringtone, RINGTONE_MAXLEN);
+    if (len > 4)
+    {
+      /* write volume (replace first byte) */
+      ringtone[0] = volume;
+      printf("len=%d\n", len);
+      yld_write_control_file_bin(&yldisp_data, "ringtone", ringtone, len);
+    }
+    else
+    {
+      fprintf(stderr, "too short ringfile %s (len=%d)\n", ringfile, len);
+    }
+    close(fd_in);
+  }
+  else
+  {
+    fprintf(stderr, "can't open ringfile %s\n", ringfile);
+  }
+  
+  free(ringfile);
 }
 
 

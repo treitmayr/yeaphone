@@ -184,6 +184,46 @@ void extract_callernum(ylcontrol_data_t *ylc_ptr, const char *line) {
 
 /**********************************/
 
+/* callerid to ringtone name */
+unsigned char *callerid2ringtone(char *dialnum)
+{
+  char *calleridkey;
+  char *keyprefix = "distinctivering_";
+  unsigned char *ringtone;
+  
+  calleridkey = malloc(strlen(keyprefix) + strlen(dialnum) + 1);
+  strcpy(calleridkey, keyprefix);
+  strcat(calleridkey, dialnum);
+  ringtone = ypconfig_get_value(calleridkey);
+  free(calleridkey);
+  return ringtone;
+}
+
+void load_custom_ringtone(const char *callernum) 
+{
+  unsigned char *ringtone, *ringtone_distinctive = NULL;
+  
+  if (callernum && strlen(callernum))
+  {
+    ringtone_distinctive = callerid2ringtone(callernum);
+  }
+
+  if (ringtone_distinctive)
+    ringtone = ringtone_distinctive;
+  else
+    ringtone = callerid2ringtone("unknown");
+
+  if (ringtone) {
+    /* upload custom ringtone based on callerid */
+    printf("setting ring tone to %s\n", ringtone);
+    usleep(170000);
+    set_yldisp_set_ringtone(ringtone, 250);
+    usleep(170000);
+  }
+}
+
+/**********************************/
+
 void handle_key(ylcontrol_data_t *ylc_ptr, int code, int value) {
   char c;
   gstate_t lpstate_power;
@@ -509,6 +549,7 @@ void lps_callback(struct _LinphoneCore *lc,
       
     case GSTATE_CALL_IN_INVITE:
       extract_callernum(&ylcontrol_data, gstate->message);
+      load_custom_ringtone(ylcontrol_data.callernum);
       if (strlen(ylcontrol_data.callernum)) {
         display_dialnum(ylcontrol_data.callernum);
         strcpy(ylcontrol_data.dialback, ylcontrol_data.callernum);
