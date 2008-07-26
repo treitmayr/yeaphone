@@ -463,16 +463,16 @@ void lps_callback(struct _LinphoneCore *lc,
       break;
       
     case GSTATE_POWER_ON:
-      set_yldisp_text("- register -");
+      display_dialnum("");
       break;
       
     case GSTATE_REG_FAILED:
       if (lpstate_power != GSTATE_POWER_ON)
         break;
       if (lpstate_call == GSTATE_CALL_IDLE) {
-        set_yldisp_text("-reg failed-");
-        ylcontrol_data.dialback[0] = '\0';
-        ylcontrol_data.dialnum[0] = '\0';
+        if (ylcontrol_data.dialnum[0] == '\0') {
+          set_yldisp_text("-reg failed-");
+        }
         yldisp_led_blink(150, 150);
       }
       break;
@@ -487,9 +487,9 @@ void lps_callback(struct _LinphoneCore *lc,
       if (lpstate_power != GSTATE_POWER_ON)
         break;
       if (lpstate_call == GSTATE_CALL_IDLE) {
-        display_dialnum("");
-        ylcontrol_data.dialback[0] = '\0';
-        ylcontrol_data.dialnum[0] = '\0';
+        if (ylcontrol_data.dialnum[0] == '\0') {
+          display_dialnum(ylcontrol_data.dialback);
+        }
         yldisp_led_on();
       }
       break;
@@ -510,10 +510,15 @@ void lps_callback(struct _LinphoneCore *lc,
       
     case GSTATE_CALL_IN_INVITE:
       extract_callernum(&ylcontrol_data, gstate->message);
-      if (strlen(ylcontrol_data.callernum))
+      if (strlen(ylcontrol_data.callernum)) {
         display_dialnum(ylcontrol_data.callernum);
-      else
+        strcpy(ylcontrol_data.dialback, ylcontrol_data.callernum);
+      }
+      else {
         display_dialnum(" - - -");
+        ylcontrol_data.dialback[0] = '\0';
+      }
+      ylcontrol_data.dialnum[0] = '\0';
       
       set_yldisp_call_type(YL_CALL_IN);
       yldisp_led_blink(300, 300);
@@ -523,9 +528,6 @@ void lps_callback(struct _LinphoneCore *lc,
        * This seems to be a limitation of the hardware */
       usleep(170000);
       set_yldisp_ringer(YL_RINGER_ON);
-      
-      strcpy(ylcontrol_data.dialback, ylcontrol_data.callernum);
-      ylcontrol_data.dialnum[0] = '\0';
       break;
       
     case GSTATE_CALL_IN_CONNECTED:
@@ -551,6 +553,7 @@ void lps_callback(struct _LinphoneCore *lc,
     case GSTATE_CALL_END:
       set_yldisp_ringer(YL_RINGER_OFF);
       set_yldisp_call_type(YL_CALL_NONE);
+      display_dialnum(ylcontrol_data.dialback);
       yldisp_show_date();
       yldisp_led_on();
       break;
