@@ -239,6 +239,16 @@ void start_lpcontrol(int autoregister, void *userdata) {
   }
 }
 
+void wait_lpcontrol() {
+  puts("Wait for lpcontrol to exit");
+  
+  pthread_join(lpstates_data.lpcontrol_thread, NULL);
+}
+
+void stop_lpcontrol() {
+  pthread_cancel(lpstates_data.lpcontrol_thread);
+}
+
 /*****************************************************************/
 
 void lpstates_submit_command(lpstates_command_t command, char *arg) {

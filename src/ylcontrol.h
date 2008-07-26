@@ -31,5 +31,8 @@
 void init_ylcontrol();
 void start_ylcontrol();
 
+void wait_ylcontrol();
+void stop_ylcontrol();
+
 
 #endif

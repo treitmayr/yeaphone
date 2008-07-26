@@ -27,6 +27,7 @@
 #include <mcheck.h>
 
 #include <stdlib.h>
+#include <signal.h>
 #include "yldisp.h"
 #include "lpcontrol.h"
 #include "ylcontrol.h"
@@ -84,6 +85,14 @@ void read_config() {
 }
 
 
+void terminate(int signal)
+{
+  puts("graceful exit requested");
+  stop_lpcontrol();
+  stop_ylcontrol();
+}
+
+
 int main(int argc, char **argv) {
   parse_args(argc, argv);
   read_config();
@@ -94,14 +103,18 @@ int main(int argc, char **argv) {
   start_lpcontrol(1, NULL);
   start_ylcontrol();
   
+  /* graceful exit handler */
+  signal(SIGINT, &terminate);
+  signal(SIGTERM, &terminate);
+  
 #ifdef MTRACE
   /* track down memory leaks !! */
   sleep(10);
   mtrace();
 #endif
   
-  while (1)
-    sleep(10);
+  wait_ylcontrol();
+  wait_lpcontrol();
  
   return(0);
 }

@@ -678,3 +678,14 @@ void start_ylcontrol() {
   pthread_create(&(ylcontrol_data.control_thread), NULL, control_proc, &ylcontrol_data);
 }
 
+void wait_ylcontrol() {
+  puts("Wait for ylcontrol to exit");
+  
+  pthread_join(ylcontrol_data.control_thread, NULL);
+}
+
+void stop_ylcontrol() {
+  pthread_cancel(ylcontrol_data.control_thread);
+  yldisp_hide_all();
+}
+
