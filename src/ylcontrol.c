@@ -185,10 +185,10 @@ void extract_callernum(ylcontrol_data_t *ylc_ptr, const char *line) {
 /**********************************/
 
 /* callerid to ringtone name */
-unsigned char *callerid2ringtone(char *dialnum)
+unsigned char *callerid2ringtone(const char *dialnum)
 {
   char *calleridkey;
-  char *keyprefix = "distinctivering_";
+  char *keyprefix = "ringtone_";
   unsigned char *ringtone;
   
   calleridkey = malloc(strlen(keyprefix) + strlen(dialnum) + 1);
@@ -211,14 +211,12 @@ void load_custom_ringtone(const char *callernum)
   if (ringtone_distinctive)
     ringtone = ringtone_distinctive;
   else
-    ringtone = callerid2ringtone("unknown");
+    ringtone = callerid2ringtone("default");
 
   if (ringtone) {
     /* upload custom ringtone based on callerid */
     printf("setting ring tone to %s\n", ringtone);
-    usleep(170000);
     set_yldisp_set_ringtone(ringtone, 250);
-    usleep(170000);
   }
 }
 
@@ -564,9 +562,9 @@ void lps_callback(struct _LinphoneCore *lc,
       yldisp_led_blink(300, 300);
       
       /* ringing seems to block displaying line 3,
-       * so we have to wait for about 170ms.
+       * so we have to wait for about 200ms.
        * This seems to be a limitation of the hardware */
-      usleep(170000);
+      usleep(200000);
       set_yldisp_ringer(YL_RINGER_ON);
       break;
       

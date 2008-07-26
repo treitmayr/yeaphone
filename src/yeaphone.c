@@ -68,15 +68,13 @@ void read_config() {
   
   home = getenv("HOME");
   if (home) {
-    len += strlen(home) + strlen(CONFIG_FILE) + 2;
+    len = strlen(home) + strlen(CONFIG_FILE) + 2;
     cfgfile = malloc(len);
     strcpy(cfgfile, home);
     strcat(cfgfile, "/"CONFIG_FILE);
   }
   else {
-    len += strlen(CONFIG_FILE) + 1;
-    cfgfile = malloc(len);
-    strcpy(cfgfile, CONFIG_FILE);
+    cfgfile = strdup(CONFIG_FILE);
   }
   
   ypconfig_read(cfgfile);

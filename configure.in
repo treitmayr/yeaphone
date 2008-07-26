@@ -52,5 +52,6 @@ AC_CHECK_FUNCS([select strchr strdup strrchr])
 
 AC_CONFIG_FILES([Makefile
                  src/Makefile
+                 contrib/ringtones/Makefile
                  yeaphone.spec])
 AC_OUTPUT

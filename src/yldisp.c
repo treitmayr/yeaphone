@@ -647,17 +647,16 @@ void set_yldisp_set_ringtone(char *ringname, unsigned char volume)
   char *ringfile;
   char *home;
 
+  /* ringname may be either a path relative to RINGDIR or an absolute path */
   home = getenv("HOME");
-  if (home) {
+  if (home && (ringname[0] != '/')) {
     len = strlen(home) + strlen(RING_DIR) + strlen(ringname) + 3;
     ringfile = malloc(len);
     strcpy(ringfile, home);
     strcat(ringfile, "/"RING_DIR"/");
     strcat(ringfile, ringname);
   } else {
-    len = strlen(ringname) + 1;
-    ringfile = malloc(len);
-    strcpy(ringfile, ringname);
+    ringfile = strdup(ringname);
   }
 
   /* read binary file (replacing first byte with volume)
@@ -673,7 +672,6 @@ void set_yldisp_set_ringtone(char *ringname, unsigned char volume)
     {
       /* write volume (replace first byte) */
       ringtone[0] = volume;
-      printf("len=%d\n", len);
       yld_write_control_file_bin(&yldisp_data, "ringtone", ringtone, len);
     }
     else
