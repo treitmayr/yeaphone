@@ -201,7 +201,9 @@ void handle_key(ylcontrol_data_t *ylc_ptr, int code, int value) {
   else {
     ylc_ptr->pressed = (value) ? code : -1;
     if (value) {
-      /*printf("key=%d\n", code);*/
+#if 0
+      printf("key=%d\n", code);
+#endif
       switch (code) {
         case 2:       /* '1'..'9' */
         case 3:
@@ -214,6 +216,7 @@ void handle_key(ylcontrol_data_t *ylc_ptr, int code, int value) {
         case 10:
         case 11:      /* '0' */
         case 55:      /* '*' */
+        case 103:     /* UP */
           if (lpstate_power != GSTATE_POWER_ON)
             break;
           /* get the real character */
@@ -225,8 +228,8 @@ void handle_key(ylcontrol_data_t *ylc_ptr, int code, int value) {
               lpstate_reg  == GSTATE_REG_OK) {
             int len = strlen(ylc_ptr->dialnum);
             
-            if (c == '#') {
-              /* the store/recall character */
+            if (code == 103) {
+              /* store/recall (cursor up) */
               if ((len > 0) || ylc_ptr->dialback[0]) {
                 /* prepare to store the currently displayed number */
                 ylc_ptr->prep_store = 1;
@@ -239,7 +242,7 @@ void handle_key(ylcontrol_data_t *ylc_ptr, int code, int value) {
               }
             }
             else
-            if (c >= '0' && c <= '9') {
+            if ((c >= '0' && c <= '9') || c == '*' || c == '#') {
               if (ylc_ptr->prep_store) {
                 /* store number */
                 char *key;
@@ -387,9 +390,6 @@ void handle_key(ylcontrol_data_t *ylc_ptr, int code, int value) {
               lpstate_call == GSTATE_CALL_IDLE*/) {
             lpstates_submit_command(LPCOMMAND_RING_VOLUP, NULL);
           }
-          break;
-        
-        case 103:        /* UP */
           break;
         
         case 108:        /* DOWN */
