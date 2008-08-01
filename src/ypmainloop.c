@@ -32,10 +32,16 @@
 #include <errno.h>
 #include <sys/time.h>
 #include <sys/types.h>
+
 #include "ypmainloop.h"
+#include "config.h"
+
+#ifdef HAVE_PTHREAD_H
+#include <pthread.h>
+#endif
 
 
-#define INITIAL_EV_LIST_SIZE  5
+#define INITIAL_EV_LIST_SIZE  6
 #define TIMER_MIN_RESOLUTIN  10         /* in [ms] */
 
 
@@ -67,6 +73,7 @@ struct ml_data_s {
   int wakeup_read, wakeup_write;
   int is_running;
   int is_awake;
+  pthread_t thread;
 };
 
 static struct ml_data_s ml_data;
@@ -128,6 +135,7 @@ int yp_ml_run()
   }
   ml_data.is_running = 1;
   result = 0;
+  ml_data.thread  = pthread_self();
   
   while (ml_data.is_running) {
     /* find the timer to expire next */
@@ -243,22 +251,23 @@ int yp_ml_run()
       if (index >= 0) {
         current = &(ml_data.ev_list[index]);
         current->processed = 1;
-        if (current->callback) {
-          current->callback(index, ml_data.ev_list[index].group_id,
-                            current->callback_data);
-        }
         if (current->type == EV_TYPE_TIMER) {
           /* remove timer */
           current->type = EV_TYPE_EMPTY;
         }
         else {
           /* reschedule timer */
+          /* TODO: What happens if we were suspended for a while? */
           current->tv.tv_sec += (current->interval / 1000);
           current->tv.tv_usec += ((long) (current->interval % 1000) * 1000L);
           if (current->tv.tv_usec > 1000000L) {
             current->tv.tv_sec++;
             current->tv.tv_usec -= 1000000L;
           }
+        }
+        if (current->callback) {
+          current->callback(index, ml_data.ev_list[index].group_id,
+                            current->callback_data);
         }
       }
     } while (index >= 0);
@@ -380,6 +389,7 @@ int yp_ml_poll_io(int group_id, int fd,
     struct event_list *new_base;
     
     fprintf(stderr, "extending event list\n");
+    event_id = ml_data.ev_list_size;
     ml_data.ev_list_size++;
     new_base = realloc(ml_data.ev_list,
                        ml_data.ev_list_size * sizeof(ml_data.ev_list[0]));
@@ -388,7 +398,6 @@ int yp_ml_poll_io(int group_id, int fd,
       return -ENOMEM;
     }
     ml_data.ev_list = new_base;
-    event_id = ml_data.ev_list_size - 1;
     empty = &(new_base[event_id]);
   }
   empty->type = EV_TYPE_IO;
@@ -443,4 +452,33 @@ int yp_ml_remove_event(int event_id, int group_id)
   
   return count;
 }
+
+int yp_ml_count_events(int event_id, int group_id)
+{
+  int count = 0;
+  int i;
+  struct event_list *current;
+  
+  current = ml_data.ev_list;
+  for (i = 0; i < ml_data.ev_list_size; i++, current++) {
+    if ((current->type != EV_TYPE_EMPTY) &&
+        ((event_id < 0) || (event_id == i)) &&
+        ((group_id < 0) || (current->group_id == group_id))) {
+      count++;
+    }
+  }
+  
+  return count;
+}
+
+/*****************************************************************/
+
+int yp_ml_same_thread(void) {
+#ifdef HAVE_PTHREAD_H
+  return (ml_data.is_running) ? pthread_equal(pthread_self(), ml_data.thread) : 1;
+#else
+  return 1;
+#endif
+}
+
 

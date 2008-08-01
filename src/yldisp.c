@@ -2,7 +2,7 @@
  *
  *  File: yldisp.c
  *
- *  Copyright (C) 2006, 2007  Thomas Reitmayr <treitmayr@devbase.at>
+ *  Copyright (C) 2006 - 2008  Thomas Reitmayr <treitmayr@devbase.at>
  *
  ****************************************************************************
  *
@@ -28,6 +28,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <ctype.h>
 #include <fcntl.h>
 #include <time.h>
 #include <sys/stat.h>
@@ -47,6 +48,7 @@
 
 #define YLDISP_BLINK_ID     20
 #define YLDISP_DATETIME_ID  21
+#define YLDISP_MINRING_ID   22
 
 const char *YLDISP_DRIVER_BASEDIR = "/sys/bus/usb/drivers/yealink/";
 const char *YLDISP_INPUT_BASE = "/dev/input/event";
@@ -56,12 +58,17 @@ typedef struct yldisp_data_s {
   char *path_event;
   char *path_buf;
   
+  yl_models_t model;
+  int led_inverted;
+  
   unsigned int blink_on_time;
   unsigned int blink_off_time;
   int blink_off_reschedule;
   
   time_t counter_base;
   int wait_date_after_count;
+  
+  int ring_off_delayed;
 } yldisp_data_t;
 
 
@@ -70,12 +77,12 @@ yldisp_data_t yldisp_data;
 /*****************************************************************/
 /* forward declarations */
 
-void *blink_proc(void *arg);
-void *counter_proc(void *arg);
+static void yldisp_determine_model();
 
 /*****************************************************************/
 
-int exist_dir(const char *dirname) {
+int exist_dir(const char *dirname)
+{
   DIR *dir_handle;
   int result = 0;
   
@@ -91,7 +98,8 @@ int exist_dir(const char *dirname) {
 
 typedef int (*cmp_dirent) (const char *dirname, void *priv);
 
-char *find_dirent(const char *dirname, cmp_dirent compare, void *priv) {
+char *find_dirent(const char *dirname, cmp_dirent compare, void *priv)
+{
   DIR *dir_handle;
   struct dirent *dirent;
   char *result = NULL;
@@ -115,7 +123,8 @@ char *find_dirent(const char *dirname, cmp_dirent compare, void *priv) {
 
 /*****************************************************************/
 
-char *get_num_ptr(char *s) {
+char *get_num_ptr(char *s)
+{
   /* old link to input class directory found, now deprecated */
   char *cptr = s;
   while (*cptr && !isdigit(*cptr))
@@ -125,7 +134,8 @@ char *get_num_ptr(char *s) {
 
 /*****************************************************************/
 
-int cmp_devlink(const char *dirname, void *priv) {
+int cmp_devlink(const char *dirname, void *priv)
+{
   (void) priv;
   return (dirname && dirname[0] >= '0' && dirname[0] <= '9');
 }
@@ -144,8 +154,6 @@ int cmp_inputdir(const char *dirname, void *priv) {
 }
 
 void yldisp_init() {
-  DIR *driver_dir;
-  struct dirent *driver_dirent;
   char *symlink;
   char *dirname;
   int plen;
@@ -239,12 +247,15 @@ void yldisp_init() {
     abort();
   }
   
+  yldisp_determine_model();
+  
   yldisp_hide_all();
 }
 
 /*****************************************************************/
 
-void yldisp_uninit() {
+void yldisp_uninit()
+{
   yp_ml_remove_event(-1, YLDISP_BLINK_ID);
   yp_ml_remove_event(-1, YLDISP_DATETIME_ID);
   
@@ -255,10 +266,11 @@ void yldisp_uninit() {
 
 /*****************************************************************/
 
-int yld_write_control_file_bin(yldisp_data_t *yld_ptr,
-                               char *control,
-                               char *buf,
-                               int size) {
+static int yld_write_control_file_buf(yldisp_data_t *yld_ptr,
+                                      const char *control,
+                                      const char *buf,
+                                      int size)
+{
   FILE *fp;
   int res;
   
@@ -277,23 +289,34 @@ int yld_write_control_file_bin(yldisp_data_t *yld_ptr,
     res = -1;
   }
   
-  return (res < 0) ? 0 : res;
+  return res;
 }
 
 /*****************************************************************/
 
-int yld_write_control_file(yldisp_data_t *yld_ptr,
-                           char *control,
-                           char *line) {
+static inline int yld_write_control_file(yldisp_data_t *yld_ptr,
+                                         const char *control,
+                                         const char *line)
+{
+  return yld_write_control_file_buf(yld_ptr, control, line, strlen(line));
+}
+
+/*****************************************************************/
+
+static int yld_read_control_file_buf(yldisp_data_t *yld_ptr,
+                                     const char *control,
+                                     char *buf,
+                                     int size)
+{
   FILE *fp;
   int res;
   
   strcpy(yld_ptr->path_buf, yld_ptr->path_sysfs);
   strcat(yld_ptr->path_buf, control);
   
-  fp = fopen(yld_ptr->path_buf, "w");
+  fp = fopen(yld_ptr->path_buf, "rb");
   if (fp) {
-    res = fputs(line, fp);
+    res = fread(buf, 1, size, fp);
     if (res < 0)
       perror(yld_ptr->path_buf);
     fclose(fp);
@@ -303,7 +326,58 @@ int yld_write_control_file(yldisp_data_t *yld_ptr,
     res = -1;
   }
   
-  return (res < 0) ? 0 : strlen(line);
+  return res;
+}
+
+/*****************************************************************/
+
+static inline int yld_read_control_file(yldisp_data_t *yld_ptr,
+                                        const char *control,
+                                        char *line,
+                                        int size)
+{
+  int len = yld_read_control_file_buf(yld_ptr, control, line, size - 1);
+  if (len >= 0)
+    line[len] = '\0';
+  return len;
+}
+
+/*****************************************************************/
+
+const static char *model_strings[] = { "P1K", "P4K", "B2K", "P1KH", "Unknown" };
+
+static void yldisp_determine_model()
+{
+  char model_str[50];
+  int len;
+  
+  len = yld_read_control_file(&yldisp_data, "model",
+                              model_str, sizeof(model_str));
+  yldisp_data.led_inverted = ((len < 0) || (model_str[0] == ' ') ||
+                                           (model_str[0] == '*'));
+  if ((len < 0) || !strcmp(model_str, "P1K") || strstr(model_str, "*P1K"))
+    yldisp_data.model = YL_MODEL_P1K;
+  else
+  if (!strcmp(model_str, "P1KH"))
+    yldisp_data.model = YL_MODEL_P1KH;
+  else
+  if (!strcmp(model_str, "P4K") || strstr(model_str, "*P4K"))
+    yldisp_data.model = YL_MODEL_P4K;
+  else
+  if (!strcmp(model_str, "B2K") || strstr(model_str, "*B2K"))
+    yldisp_data.model = YL_MODEL_B2K;
+  else
+    yldisp_data.model = YL_MODEL_UNKNOWN;
+  
+  if (yldisp_data.model != YL_MODEL_UNKNOWN)
+    printf("Detected handset Yealink USB-%s\n", model_strings[yldisp_data.model]);
+  else
+    printf("Unable to detect type of handset\n");
+}
+
+yl_models_t get_yldisp_model()
+{
+  return yldisp_data.model;
 }
 
 /*****************************************************************/
@@ -317,13 +391,17 @@ static void led_off_callback(int id, int group, void *private_data) {
                                   yld_ptr->blink_on_time + yld_ptr->blink_off_time,
                                   led_off_callback, private_data);
   }
-  yld_write_control_file(yld_ptr, "hide_icon", "LED");
+  yld_write_control_file(yld_ptr,
+                         (yldisp_data.led_inverted) ? "show_icon" : "hide_icon",
+                         "LED");
 }
 
 static void led_on_callback(int id, int group, void *private_data) {
   yldisp_data_t *yld_ptr = private_data;
   
-  yld_write_control_file(yld_ptr, "show_icon", "LED");
+  yld_write_control_file(yld_ptr,
+                         (yldisp_data.led_inverted) ? "hide_icon" : "show_icon",
+                         "LED");
 }
 
 void yldisp_led_blink(unsigned int on_time, unsigned int off_time) {
@@ -477,14 +555,22 @@ yl_store_type_t get_yldisp_store_type() {
 
 #define RINGTONE_MAXLEN 256
 #define RING_DIR ".yeaphone/ringtone"
-void set_yldisp_set_ringtone(char *ringname, unsigned char volume)
+void set_yldisp_ringtone(char *ringname, unsigned char volume)
 {
   int fd_in;
-  unsigned char ringtone[RINGTONE_MAXLEN];
+  char ringtone[RINGTONE_MAXLEN];
   int len = 0;
   char *ringfile;
   char *home;
 
+  if ((yldisp_data.model == YL_MODEL_P4K) || (yldisp_data.model == YL_MODEL_B2K))
+    return;
+
+  /* make sure the buzzer is turned off! */
+  if (yp_ml_remove_event(-1, YLDISP_MINRING_ID) > 0) {
+    yld_write_control_file(&yldisp_data, "hide_icon", "RINGTONE");
+    usleep(10000);   /* urgh! TODO: Get rid of the delay! */
+  }
   /* ringname may be either a path relative to RINGDIR or an absolute path */
   home = getenv("HOME");
   if (home && (ringname[0] != '/')) {
@@ -510,7 +596,7 @@ void set_yldisp_set_ringtone(char *ringname, unsigned char volume)
     {
       /* write volume (replace first byte) */
       ringtone[0] = volume;
-      yld_write_control_file_bin(&yldisp_data, "ringtone", ringtone, len);
+      yld_write_control_file_buf(&yldisp_data, "ringtone", ringtone, len);
     }
     else
     {
@@ -527,10 +613,42 @@ void set_yldisp_set_ringtone(char *ringname, unsigned char volume)
 }
 
 
-void set_yldisp_ringer(yl_ringer_state_t rs) {
-  yld_write_control_file(&yldisp_data,
-                         (rs == YL_RINGER_ON) ? "show_icon" : "hide_icon",
-                         "RINGTONE");
+void yldisp_minring_callback(int id, int group, void *private_data) {
+  yldisp_data_t *yld_ptr = private_data;
+  if (yld_ptr->ring_off_delayed) {
+    yld_write_control_file(yld_ptr, "hide_icon", "RINGTONE");
+    yld_ptr->ring_off_delayed = 0;
+  }
+}
+
+void set_yldisp_ringer(yl_ringer_state_t rs, int minring) {
+  switch (rs) {
+    case YL_RINGER_ON:
+      if (yp_ml_remove_event(-1, YLDISP_MINRING_ID) > 0) {
+        yld_write_control_file(&yldisp_data, "hide_icon",
+                 (yldisp_data.model == YL_MODEL_P4K) ? "SPEAKER" : "RINGTONE");
+        usleep(10000);   /* urgh! TODO: Get rid of the delay! */
+      }
+      yldisp_data.ring_off_delayed = 0;
+      yp_ml_schedule_timer(YLDISP_MINRING_ID, minring,
+                           yldisp_minring_callback, &yldisp_data);
+      yld_write_control_file(&yldisp_data, "show_icon",
+               (yldisp_data.model == YL_MODEL_P4K) ? "SPEAKER" : "RINGTONE");
+      break;
+    case YL_RINGER_OFF_DELAYED:
+      if (yp_ml_count_events(-1, YLDISP_MINRING_ID) > 0)
+        yldisp_data.ring_off_delayed = 1;
+      else
+        yld_write_control_file(&yldisp_data, "hide_icon",
+                 (yldisp_data.model == YL_MODEL_P4K) ? "SPEAKER" : "RINGTONE");
+      break;
+    case YL_RINGER_OFF:
+      yld_write_control_file(&yldisp_data, "hide_icon",
+               (yldisp_data.model == YL_MODEL_P4K) ? "SPEAKER" : "RINGTONE");
+      yp_ml_remove_event(-1, YLDISP_MINRING_ID);
+      yldisp_data.ring_off_delayed = 0;
+      break;
+  }
 }
 
 yl_ringer_state_t get_yldisp_ringer() {
@@ -555,6 +673,7 @@ char *get_yldisp_text() {
 
 
 void yldisp_hide_all() {
+  set_yldisp_ringer(YL_RINGER_OFF, 0);
   yldisp_led_off();
   yldisp_stop_counter();
   yld_write_control_file(&yldisp_data, "line1", "                 ");
