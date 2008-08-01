@@ -506,6 +506,7 @@ void lps_callback(struct _LinphoneCore *lc,
   gstate_t lpstate_power;
   gstate_t lpstate_call;
   gstate_t lpstate_reg;
+  yl_models_t model;
   
   /* make sure this is the same thread as our main loop! */
   assert(yp_ml_same_thread());
@@ -513,6 +514,8 @@ void lps_callback(struct _LinphoneCore *lc,
   lpstate_power = gstate_get_state(GSTATE_GROUP_POWER);
   lpstate_call = gstate_get_state(GSTATE_GROUP_CALL);
   lpstate_reg = gstate_get_state(GSTATE_GROUP_REG);
+  
+  model = get_yldisp_model();
   
   switch (gstate->new_state) {
     case GSTATE_POWER_OFF:
@@ -589,11 +592,13 @@ void lps_callback(struct _LinphoneCore *lc,
       
       set_yldisp_call_type(YL_CALL_IN);
       yldisp_led_blink(300, 300);
-      
-      /* ringing seems to block displaying line 3,
-       * so we have to wait for about 170ms.
-       * This seems to be a limitation of the hardware */
-      usleep(170000);
+
+      if (get_yldisp_model() == YL_MODEL_P1K) {
+        /* ringing seems to block displaying line 3,
+         * so we have to wait for about 170ms.
+         * This seems to be a limitation of the hardware */
+        usleep(170000);
+      }
       set_yldisp_ringer(YL_RINGER_ON, callerid2minring(ylcontrol_data.callernum));
       break;
       

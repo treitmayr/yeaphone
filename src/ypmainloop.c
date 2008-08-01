@@ -251,22 +251,23 @@ int yp_ml_run()
       if (index >= 0) {
         current = &(ml_data.ev_list[index]);
         current->processed = 1;
-        if (current->callback) {
-          current->callback(index, ml_data.ev_list[index].group_id,
-                            current->callback_data);
-        }
         if (current->type == EV_TYPE_TIMER) {
           /* remove timer */
           current->type = EV_TYPE_EMPTY;
         }
         else {
           /* reschedule timer */
+          /* TODO: What happens if we were suspended for a while? */
           current->tv.tv_sec += (current->interval / 1000);
           current->tv.tv_usec += ((long) (current->interval % 1000) * 1000L);
           if (current->tv.tv_usec > 1000000L) {
             current->tv.tv_sec++;
             current->tv.tv_usec -= 1000000L;
           }
+        }
+        if (current->callback) {
+          current->callback(index, ml_data.ev_list[index].group_id,
+                            current->callback_data);
         }
       }
     } while (index >= 0);
