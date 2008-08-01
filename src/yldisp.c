@@ -28,6 +28,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <ctype.h>
 #include <fcntl.h>
 #include <time.h>
 #include <sys/stat.h>
@@ -147,8 +148,6 @@ int cmp_inputdir(const char *dirname, void *priv) {
 }
 
 void yldisp_init() {
-  DIR *driver_dir;
-  struct dirent *driver_dirent;
   char *symlink;
   char *dirname;
   int plen;
@@ -258,10 +257,10 @@ void yldisp_uninit() {
 
 /*****************************************************************/
 
-int yld_write_control_file_bin(yldisp_data_t *yld_ptr,
-                               char *control,
-                               char *buf,
-                               int size) {
+static int yld_write_control_file_buf(yldisp_data_t *yld_ptr,
+                                      const char *control,
+                                      const char *buf,
+                                      int size) {
   FILE *fp;
   int res;
   
@@ -285,28 +284,10 @@ int yld_write_control_file_bin(yldisp_data_t *yld_ptr,
 
 /*****************************************************************/
 
-int yld_write_control_file(yldisp_data_t *yld_ptr,
-                           char *control,
-                           char *line) {
-  FILE *fp;
-  int res;
-  
-  strcpy(yld_ptr->path_buf, yld_ptr->path_sysfs);
-  strcat(yld_ptr->path_buf, control);
-  
-  fp = fopen(yld_ptr->path_buf, "w");
-  if (fp) {
-    res = fputs(line, fp);
-    if (res < 0)
-      perror(yld_ptr->path_buf);
-    fclose(fp);
-  }
-  else {
-    perror(yld_ptr->path_buf);
-    res = -1;
-  }
-  
-  return (res < 0) ? 0 : strlen(line);
+static inline int yld_write_control_file(yldisp_data_t *yld_ptr,
+                                         const char *control,
+                                         const char *line) {
+  return yld_write_control_file_buf(yld_ptr, control, line, strlen(line));
 }
 
 /*****************************************************************/
@@ -483,7 +464,7 @@ yl_store_type_t get_yldisp_store_type() {
 void set_yldisp_ringtone(char *ringname, unsigned char volume)
 {
   int fd_in;
-  unsigned char ringtone[RINGTONE_MAXLEN];
+  char ringtone[RINGTONE_MAXLEN];
   int len = 0;
   char *ringfile;
   char *home;
@@ -518,7 +499,7 @@ void set_yldisp_ringtone(char *ringname, unsigned char volume)
     {
       /* write volume (replace first byte) */
       ringtone[0] = volume;
-      yld_write_control_file_bin(&yldisp_data, "ringtone", ringtone, len);
+      yld_write_control_file_buf(&yldisp_data, "ringtone", ringtone, len);
     }
     else
     {

@@ -46,4 +46,6 @@ int yp_ml_remove_event(int event_id, int group_id);
 
 int yp_ml_count_events(int event_id, int group_id);
 
+int yp_ml_same_thread(void);
+
 #endif

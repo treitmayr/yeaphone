@@ -29,6 +29,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <fcntl.h>
+#include <assert.h>
 #include <linux/input.h>
 
 #include <linphone/linphonecore.h>
@@ -37,6 +38,7 @@
 #include "lpcontrol.h"
 #include "ylcontrol.h"
 #include "ypconfig.h"
+#include "ypmainloop.h"
 
 #ifdef DMALLOC
 #include <dmalloc.h>
@@ -184,11 +186,11 @@ void extract_callernum(ylcontrol_data_t *ylc_ptr, const char *line) {
 /**********************************/
 
 /* callerid to ringtone name */
-unsigned char *callerid2ringtone(const char *dialnum)
+static char *callerid2ringtone(const char *dialnum)
 {
   char *calleridkey;
   char *keyprefix = "ringtone_";
-  unsigned char *ringtone;
+  char *ringtone;
   
   calleridkey = malloc(strlen(keyprefix) + strlen(dialnum) + 1);
   strcpy(calleridkey, keyprefix);
@@ -198,9 +200,9 @@ unsigned char *callerid2ringtone(const char *dialnum)
   return ringtone;
 }
 
-void load_custom_ringtone(const char *callernum) 
+static void load_custom_ringtone(const char *callernum) 
 {
-  unsigned char *ringtone, *ringtone_distinctive = NULL;
+  char *ringtone, *ringtone_distinctive = NULL;
   
   if (callernum && strlen(callernum))
   {
@@ -222,12 +224,12 @@ void load_custom_ringtone(const char *callernum)
 /***********************************/
 
 /* callerid to minimum ring duration in [ms] */
-int callerid2minring(const char *callernum)
+static int callerid2minring(const char *callernum)
 {
-  char *dialnum;
+  const char *dialnum;
   char *calleridkey;
   char *keyprefix = "minring_";
-  unsigned char *minring_str;
+  char *minring_str;
   int minring = 0;
   
   dialnum = (callernum && callernum[0]) ? callernum : "default";
@@ -504,6 +506,9 @@ void lps_callback(struct _LinphoneCore *lc,
   gstate_t lpstate_power;
   gstate_t lpstate_call;
   gstate_t lpstate_reg;
+  
+  /* make sure this is the same thread as our main loop! */
+  assert(yp_ml_same_thread());
   
   lpstate_power = gstate_get_state(GSTATE_GROUP_POWER);
   lpstate_call = gstate_get_state(GSTATE_GROUP_CALL);

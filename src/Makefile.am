@@ -12,7 +12,7 @@ yeaphone_SOURCES = lpcontrol.c  yeaphone.c ylcontrol.h yldisp.h ypconfig.h \
 
 # libraries
 yeaphone_LDADD = @LINPHONE_LIBS@
-yeaphone_LDFLAGS = -Wl,--rpath -Wl,@LINPHONE_LIBDIR@
+yeaphone_LDFLAGS = -Wl,--rpath -Wl,@LINPHONE_LIBDIR@ @LIBTHREAD@
 
 # mark headers to include also in package
 #EXTRA_DIST = talk.h

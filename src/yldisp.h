@@ -51,6 +51,8 @@ yl_call_type_t get_yldisp_call_type();
 void set_yldisp_store_type(yl_store_type_t st);
 yl_store_type_t get_yldisp_store_type();
 
+void set_yldisp_ringtone(char *ringname, unsigned char volume);
+
 void set_yldisp_ringer(yl_ringer_state_t rs, int minring);
 yl_ringer_state_t get_yldisp_ringer();
 
