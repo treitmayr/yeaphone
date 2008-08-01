@@ -562,9 +562,9 @@ void lps_callback(struct _LinphoneCore *lc,
       yldisp_led_blink(300, 300);
       
       /* ringing seems to block displaying line 3,
-       * so we have to wait for about 200ms.
+       * so we have to wait for about 170ms.
        * This seems to be a limitation of the hardware */
-      usleep(200000);
+      usleep(170000);
       set_yldisp_ringer(YL_RINGER_ON);
       break;
       
