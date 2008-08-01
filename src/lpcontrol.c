@@ -2,7 +2,7 @@
  *
  *  File: lpcontrol.c
  *
- *  Copyright (C) 2006, 2007  Thomas Reitmayr <treitmayr@yahoo.com>
+ *  Copyright (C) 2006, 2007  Thomas Reitmayr <treitmayr@devbase.at>
  *
  ****************************************************************************
  *
@@ -35,7 +35,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/time.h>
-#include <pthread.h>
 
 /* needed?
 #include "coreapi/exevents.h"
@@ -43,6 +42,7 @@
 #include "mediastreamer2/mediastream.h"
 */
 #include "lpcontrol.h"
+#include "ypmainloop.h"
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -67,9 +67,7 @@
 
 typedef struct lpcontrol_data_s {
   int autoregister;
-  
-  pthread_t lpcontrol_thread;
-  pthread_mutex_t mutex;
+  GeneralStateChange callback;
   
   LinphoneCoreVTable *vtable;
   LinphoneCore core_state;
@@ -197,56 +195,27 @@ static void lpc_text_received(LinphoneCore *lc, LinphoneChatRoom *cr,
  *
  ***************************************************************************/
 
+void lpcontrol_timer_callback(int id, int group, void *private_data) {
+  lpcontrol_data_t *lpd_ptr = private_data;
+  
+  linphone_core_iterate(&(lpd_ptr->core_state));
+}
 
-void *lpcontrol_thread(void *arg) {
-  lpcontrol_data_t *lpd_ptr = arg;
-  
-  while (1) {
-    while (gstate_get_state(GSTATE_GROUP_POWER) == GSTATE_POWER_OFF) {
-      usleep(200000);
-    }
-    
-    while (gstate_get_state(GSTATE_GROUP_POWER) != GSTATE_POWER_OFF) {
-      linphone_core_iterate(&(lpd_ptr->core_state));
-      usleep(200000);
-    }
-  }
-  
-  return(NULL);
+/*****************************************************************/
+
+void lpstates_callback_wrapper(struct _LinphoneCore *lc,
+                               LinphoneGeneralState *gstate) {
+  if (gstate->new_state == GSTATE_POWER_OFF)
+    yp_ml_remove_event(-1, LPCONTROL_TIMER_ID);
+
+  if (lpstates_data.callback)
+    lpstates_data.callback(lc, gstate);
 }
 
 /*****************************************************************/
 
 void set_lpstates_callback(GeneralStateChange callback) {
-  lpc_vtable.general_state = callback;
-}
-
-/*****************************************************************/
-
-void start_lpcontrol(int autoregister, void *userdata) {
-  lpstates_data.autoregister = autoregister;
-  lpstates_data.vtable = &lpc_vtable;
-  
-//  linphone_core_enable_logs(stdout);
-  linphone_core_disable_logs();
-  
-  snprintf(lpstates_data.configfile_name, PATH_MAX, "%s/.linphonerc", getenv("HOME"));
-
-  pthread_create(&(lpstates_data.lpcontrol_thread), NULL, lpcontrol_thread, &lpstates_data);
-  
-  if (autoregister) {
-    lpstates_submit_command(LPCOMMAND_STARTUP, NULL);
-  }
-}
-
-void wait_lpcontrol() {
-  puts("Wait for lpcontrol to exit");
-  
-  pthread_join(lpstates_data.lpcontrol_thread, NULL);
-}
-
-void stop_lpcontrol() {
-  pthread_cancel(lpstates_data.lpcontrol_thread);
+  lpstates_data.callback = callback;
 }
 
 /*****************************************************************/
@@ -259,6 +228,8 @@ void lpstates_submit_command(lpstates_command_t command, char *arg) {
   
   switch (command) {
     case LPCOMMAND_STARTUP:
+      yp_ml_schedule_periodic_timer(LPCONTROL_TIMER_ID, 200,
+                                    lpcontrol_timer_callback, &lpstates_data);
       linphone_core_init(&(lpstates_data.core_state), lpstates_data.vtable,
                          lpstates_data.configfile_name, &lpstates_data);
       break;
@@ -325,4 +296,24 @@ void lpstates_submit_command(lpstates_command_t command, char *arg) {
       break;
   }
 }
+
+/*****************************************************************/
+
+void start_lpcontrol(int autoregister, void *userdata) {
+  lpstates_data.autoregister = autoregister;
+  lpstates_data.vtable = &lpc_vtable;
+  
+//  linphone_core_enable_logs(stdout);
+  linphone_core_disable_logs();
+  
+  snprintf(lpstates_data.configfile_name, PATH_MAX, "%s/.linphonerc", getenv("HOME"));
+
+  lpc_vtable.general_state = lpstates_callback_wrapper;
+
+  if (autoregister) {
+    lpstates_submit_command(LPCOMMAND_STARTUP, NULL);
+  }
+}
+
+/*****************************************************************/
 

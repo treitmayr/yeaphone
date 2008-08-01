@@ -2,7 +2,7 @@
  *
  *  File: yeaphone.c
  *
- *  Copyright (C) 2006, 2007  Thomas Reitmayr <treitmayr@yahoo.com>
+ *  Copyright (C) 2006, 2007  Thomas Reitmayr <treitmayr@devbase.at>
  *
  ****************************************************************************
  *
@@ -32,6 +32,7 @@
 #include "lpcontrol.h"
 #include "ylcontrol.h"
 #include "ypconfig.h"
+#include "ypmainloop.h"
 
 #ifdef DMALLOC
 #include <dmalloc.h>
@@ -85,8 +86,7 @@ void read_config() {
 
 void terminate(int signal)
 {
-  puts("graceful exit requested");
-  stop_lpcontrol();
+  puts("\ngraceful exit requested...");
   stop_ylcontrol();
 }
 
@@ -95,9 +95,11 @@ int main(int argc, char **argv) {
   parse_args(argc, argv);
   read_config();
   
-  yldisp_init();
+  yp_ml_init();
   
+  yldisp_init();
   init_ylcontrol(mycode);
+  
   start_lpcontrol(1, NULL);
   start_ylcontrol();
   
@@ -111,8 +113,7 @@ int main(int argc, char **argv) {
   mtrace();
 #endif
   
-  wait_ylcontrol();
-  wait_lpcontrol();
+  yp_ml_run();
  
   return(0);
 }

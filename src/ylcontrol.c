@@ -2,7 +2,7 @@
  *
  *  File: ylcontrol.c
  *
- *  Copyright (C) 2006, 2007  Thomas Reitmayr <treitmayr@yahoo.com>
+ *  Copyright (C) 2006, 2007  Thomas Reitmayr <treitmayr@devbase.at>
  *
  ****************************************************************************
  *
@@ -30,7 +30,6 @@
 #include <string.h>
 #include <fcntl.h>
 #include <linux/input.h>
-#include <pthread.h>
 
 #include <linphone/linphonecore.h>
 #include <osipparser2/osip_message.h>
@@ -64,7 +63,7 @@ typedef struct ylcontrol_data_s {
   char *country_code;
   char *natl_access_code;
   
-  pthread_t control_thread;
+  int hard_shutdown;
 } ylcontrol_data_t;
 
 ylcontrol_data_t ylcontrol_data;
@@ -220,7 +219,7 @@ void load_custom_ringtone(const char *callernum)
   }
 }
 
-/**********************************/
+//**********************************/
 
 void handle_key(ylcontrol_data_t *ylc_ptr, int code, int value) {
   char c;
@@ -239,9 +238,7 @@ void handle_key(ylcontrol_data_t *ylc_ptr, int code, int value) {
   else {
     ylc_ptr->pressed = (value) ? code : -1;
     if (value) {
-#if 0
-      printf("key=%d\n", code);
-#endif
+      /*printf("key=%d\n", code);*/
       switch (code) {
         case 2:       /* '1'..'9' */
         case 3:
@@ -489,9 +486,11 @@ void lps_callback(struct _LinphoneCore *lc,
   
   switch (gstate->new_state) {
     case GSTATE_POWER_OFF:
-      yldisp_led_off();
       yldisp_hide_all();
-      set_yldisp_text("   - off -  ");
+      if (ylcontrol_data.hard_shutdown)
+        yp_ml_shutdown();
+      else
+        set_yldisp_text("   - off -  ");
       break;
       
     case GSTATE_POWER_STARTUP:
@@ -516,8 +515,8 @@ void lps_callback(struct _LinphoneCore *lc,
       break;
       
     case GSTATE_POWER_SHUTDOWN:
-      yldisp_led_blink(150, 150);
       yldisp_hide_all();
+      yldisp_led_blink(150, 150);
       set_yldisp_text("- shutdown -");
       break;
       
@@ -611,56 +610,36 @@ void lps_callback(struct _LinphoneCore *lc,
 
 /**********************************/
 
-void *control_proc(void *arg) {
-  ylcontrol_data_t *ylc_ptr = arg;
+void ylcontrol_keylong_callback(int id, int group, void *private_data) {
+  ylcontrol_data_t *ylc_ptr = private_data;
+  
+  handle_long_key(ylc_ptr, ylcontrol_data.pressed);
+  ylc_ptr->pressed = -1;
+}
+
+/**********************************/
+
+void ylcontrol_io_callback(int id, int group, void *private_data) {
+  ylcontrol_data_t *ylc_ptr = private_data;
   int bytes;
   struct input_event event;
-  fd_set master_set, read_set;
-  int max_fd;
-  struct timeval timeout;
-  
-  FD_ZERO(&master_set);
-  FD_SET(ylc_ptr->evfd, &master_set);
-  max_fd = ylc_ptr->evfd + 1;
-  
-  ylc_ptr->kshift = 0;
-  ylc_ptr->dialnum[0] = '\0';
-  ylc_ptr->dialback[0] = '\0';
-  ylc_ptr->prep_store = 0;
-  ylc_ptr->prep_recall = 0;
-  
-  while (1) {
-    int retval;
+
+  bytes = read(ylc_ptr->evfd, &event, sizeof(struct input_event));
+
+  if (bytes != (int) sizeof(struct input_event)) {
+    fprintf(stderr, "control_proc: Expected %d bytes, got %d bytes\n",
+            sizeof(struct input_event), bytes);
+    abort();
+  }
+
+  if (event.type == 1) {        /* key */
+    yp_ml_remove_event(-1, YLCONTROL_KEYLONG_ID);
+    handle_key(ylc_ptr, event.code, event.value);
     
-    memcpy(&read_set, &master_set, sizeof(master_set));
-    
-    timeout.tv_sec = 1;
-    timeout.tv_usec = 0;
-    retval = select(max_fd, &read_set, NULL, NULL/*&excpt_set*/, &timeout);
-    
-    if (retval > 0) {    /* we got an event */
-      if (FD_ISSET(ylc_ptr->evfd, &read_set)) {
-      
-        bytes = read(ylc_ptr->evfd, &event, sizeof(struct input_event));
-        
-        if (bytes != (int) sizeof(struct input_event)) {
-          fprintf(stderr, "control_proc: Expected %d bytes, got %d bytes\n",
-                  sizeof(struct input_event), bytes);
-          abort();
-        }
-        
-        if (event.type == 1) {        /* key */
-          handle_key(&ylcontrol_data, event.code, event.value);
-        }
-      }
-    }
-    else
-    if (retval == 0) {   /* timeout */
-      handle_long_key(&ylcontrol_data, ylcontrol_data.pressed);
-      ylcontrol_data.pressed = -1;
-    }
-    else {
-      /* select error */
+    if (ylcontrol_data.pressed >= 0) {
+      /* wait for key being pressed long (1 second) */
+      yp_ml_schedule_timer(YLCONTROL_KEYLONG_ID, 1000,
+                           ylcontrol_keylong_callback, private_data);
     }
   }
 }
@@ -701,6 +680,8 @@ void init_ylcontrol(char *countrycode) {
 void start_ylcontrol() {
   char *path_event;
   
+  ylcontrol_data.hard_shutdown = 0;
+  
   path_event = get_yldisp_event_path();
   
   ylcontrol_data.evfd = open(path_event, O_RDONLY);
@@ -716,17 +697,22 @@ void start_ylcontrol() {
     abort();
   }
   
-  pthread_create(&(ylcontrol_data.control_thread), NULL, control_proc, &ylcontrol_data);
+  yp_ml_poll_io(YLCONTROL_IO_ID, ylcontrol_data.evfd,
+                ylcontrol_io_callback, &ylcontrol_data);
 }
 
-void wait_ylcontrol() {
-  puts("Wait for ylcontrol to exit");
-  
-  pthread_join(ylcontrol_data.control_thread, NULL);
-}
+/*************************************/
 
 void stop_ylcontrol() {
-  pthread_cancel(ylcontrol_data.control_thread);
-  yldisp_hide_all();
+  ylcontrol_data.hard_shutdown = 1;
+  if (gstate_get_state(GSTATE_GROUP_POWER) == GSTATE_POWER_OFF) {
+    /* already powered off */
+    yldisp_hide_all();
+    yp_ml_shutdown();
+  }
+  else {
+    /* need to shut down first */
+    lpstates_submit_command(LPCOMMAND_SHUTDOWN, NULL);
+  }
 }
 

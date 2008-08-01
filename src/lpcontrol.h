@@ -30,6 +30,7 @@
 
 #include <linphone/linphonecore.h>
 
+#define LPCONTROL_TIMER_ID  1
 
 typedef enum lpstates_command_e {
   LPCOMMAND_STARTUP,
@@ -48,8 +49,6 @@ typedef enum lpstates_command_e {
 void set_lpstates_callback(GeneralStateChange callback);
 
 void start_lpcontrol(int autoregister, void *userdata);
-void wait_lpcontrol();
-void stop_lpcontrol();
 
 void lpstates_submit_command(lpstates_command_t command, char *arg);
 

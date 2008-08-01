@@ -2,7 +2,7 @@
  *
  *  File: yldisp.h
  *
- *  Copyright (C) 2006  Thomas Reitmayr <treitmayr@yahoo.com>
+ *  Copyright (C) 2006  Thomas Reitmayr <treitmayr@devbase.at>
  *
  ****************************************************************************
  *

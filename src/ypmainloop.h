@@ -1,8 +1,8 @@
 /****************************************************************************
  *
- *  File: ylcontrol.h
+ *  File: ypmainloop.h
  *
- *  Copyright (C) 2006  Thomas Reitmayr <treitmayr@yahoo.com>
+ *  Copyright (C) 2008  Thomas Reitmayr <treitmayr@devbase.at>
  *
  ****************************************************************************
  *
@@ -24,17 +24,24 @@
  *
  ****************************************************************************/
 
-#ifndef YLCONTROL_H
-#define YLCONTROL_H
+#ifndef YPMAINLOOP_H
+#define YPMAINLOOP_H
 
-#define YLCONTROL_IO_ID       10
-#define YLCONTROL_KEYLONG_ID  11
+typedef void (*yp_ml_callback)(int id, int group, void *private_data);
 
-void init_ylcontrol();
-void start_ylcontrol();
+int yp_ml_init();
+int yp_ml_run();
+int yp_ml_shutdown();
 
-void wait_ylcontrol();
-void stop_ylcontrol();
+int yp_ml_schedule_timer(int group_id, int delay,
+                         yp_ml_callback cb, void *private_data);
 
+int yp_ml_schedule_periodic_timer(int group_id, int interval,
+                                  yp_ml_callback cb, void *private_data);
+
+int yp_ml_poll_io(int group_id, int fd,
+                  yp_ml_callback cb, void *private_data);
+
+int yp_ml_remove_event(int event_id, int group_id);
 
 #endif

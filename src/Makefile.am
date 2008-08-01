@@ -6,7 +6,9 @@ INCLUDES = @LINPHONE_CFLAGS@
 bin_PROGRAMS = yeaphone
 
 # sources 
-yeaphone_SOURCES = lpcontrol.c  yeaphone.c ylcontrol.h yldisp.h ypconfig.h lpcontrol.h  ylcontrol.c  yldisp.c ypconfig.c
+yeaphone_SOURCES = lpcontrol.c  yeaphone.c ylcontrol.h yldisp.h ypconfig.h \
+                   lpcontrol.h  ylcontrol.c  yldisp.c ypconfig.c \
+                   ypmainloop.h ypmainloop.c
 
 # libraries
 yeaphone_LDADD = @LINPHONE_LIBS@
