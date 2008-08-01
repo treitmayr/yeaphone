@@ -1,0 +1,1 @@
+KERNEL=="event*", DRIVERS=="yealink", GROUP="voip", RUN+="/bin/sh -c '/bin/chgrp voip /sys$env{PHYSDEVPATH}/*'"
