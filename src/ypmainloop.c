@@ -444,3 +444,22 @@ int yp_ml_remove_event(int event_id, int group_id)
   return count;
 }
 
+int yp_ml_count_events(int event_id, int group_id)
+{
+  int count = 0;
+  int i;
+  struct event_list *current;
+  
+  current = ml_data.ev_list;
+  for (i = 0; i < ml_data.ev_list_size; i++, current++) {
+    if ((current->type != EV_TYPE_EMPTY) &&
+        ((event_id < 0) || (event_id == i)) &&
+        ((group_id < 0) || (current->group_id == group_id))) {
+      count++;
+    }
+  }
+  
+  return count;
+}
+
+

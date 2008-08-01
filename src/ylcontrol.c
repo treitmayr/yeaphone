@@ -2,7 +2,7 @@
  *
  *  File: ylcontrol.c
  *
- *  Copyright (C) 2006, 2007  Thomas Reitmayr <treitmayr@devbase.at>
+ *  Copyright (C) 2006 - 2008  Thomas Reitmayr <treitmayr@devbase.at>
  *
  ****************************************************************************
  *
@@ -215,11 +215,36 @@ void load_custom_ringtone(const char *callernum)
   if (ringtone) {
     /* upload custom ringtone based on callerid */
     printf("setting ring tone to %s\n", ringtone);
-    set_yldisp_set_ringtone(ringtone, 250);
+    set_yldisp_ringtone(ringtone, 250);
   }
 }
 
-//**********************************/
+/***********************************/
+
+/* callerid to minimum ring duration in [ms] */
+int callerid2minring(const char *callernum)
+{
+  char *dialnum;
+  char *calleridkey;
+  char *keyprefix = "minring_";
+  unsigned char *minring_str;
+  int minring = 0;
+  
+  dialnum = (callernum && callernum[0]) ? callernum : "default";
+  calleridkey = malloc(strlen(keyprefix) + strlen(dialnum) + 1);
+  strcpy(calleridkey, keyprefix);
+  strcat(calleridkey, dialnum);
+  minring_str = ypconfig_get_value(calleridkey);
+  free(calleridkey);
+  if (minring_str) {
+    minring = atoi(minring_str);
+    if (minring < 0)
+      minring = 0;
+  }
+  return (minring * 1000);
+}
+
+/***********************************/
 
 void handle_key(ylcontrol_data_t *ylc_ptr, int code, int value) {
   char c;
@@ -329,7 +354,7 @@ void handle_key(ylcontrol_data_t *ylc_ptr, int code, int value) {
           else
           if (lpstate_call == GSTATE_CALL_IN_INVITE &&
               c == '#') {
-            set_yldisp_ringer(YL_RINGER_OFF);
+            set_yldisp_ringer(YL_RINGER_OFF, 0);
           }
           break;
 
@@ -564,11 +589,11 @@ void lps_callback(struct _LinphoneCore *lc,
        * so we have to wait for about 170ms.
        * This seems to be a limitation of the hardware */
       usleep(170000);
-      set_yldisp_ringer(YL_RINGER_ON);
+      set_yldisp_ringer(YL_RINGER_ON, callerid2minring(ylcontrol_data.callernum));
       break;
       
     case GSTATE_CALL_IN_CONNECTED:
-      set_yldisp_ringer(YL_RINGER_OFF);
+      set_yldisp_ringer(YL_RINGER_OFF, 0);
       /* start timer */
       yldisp_start_counter();
       yldisp_led_blink(1000, 100);
@@ -588,7 +613,7 @@ void lps_callback(struct _LinphoneCore *lc,
       break;
       
     case GSTATE_CALL_END:
-      set_yldisp_ringer(YL_RINGER_OFF);
+      set_yldisp_ringer(YL_RINGER_OFF_DELAYED, 0);
       set_yldisp_call_type(YL_CALL_NONE);
       display_dialnum(ylcontrol_data.dialback);
       yldisp_show_date();
@@ -596,6 +621,7 @@ void lps_callback(struct _LinphoneCore *lc,
       break;
       
     case GSTATE_CALL_ERROR:
+      set_yldisp_ringer(YL_RINGER_OFF, 0);
       ylcontrol_data.dialback[0] = '\0';
       set_yldisp_call_type(YL_CALL_NONE);
       set_yldisp_text(" - error -  ");

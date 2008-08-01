@@ -44,4 +44,6 @@ int yp_ml_poll_io(int group_id, int fd,
 
 int yp_ml_remove_event(int event_id, int group_id);
 
+int yp_ml_count_events(int event_id, int group_id);
+
 #endif

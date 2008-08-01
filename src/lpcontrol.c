@@ -2,7 +2,7 @@
  *
  *  File: lpcontrol.c
  *
- *  Copyright (C) 2006, 2007  Thomas Reitmayr <treitmayr@devbase.at>
+ *  Copyright (C) 2006 - 2008  Thomas Reitmayr <treitmayr@devbase.at>
  *
  ****************************************************************************
  *

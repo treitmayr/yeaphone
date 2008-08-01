@@ -2,7 +2,7 @@
  *
  *  File: yldisp.c
  *
- *  Copyright (C) 2006, 2007  Thomas Reitmayr <treitmayr@devbase.at>
+ *  Copyright (C) 2006 - 2008  Thomas Reitmayr <treitmayr@devbase.at>
  *
  ****************************************************************************
  *
@@ -47,6 +47,7 @@
 
 #define YLDISP_BLINK_ID     20
 #define YLDISP_DATETIME_ID  21
+#define YLDISP_MINRING_ID   22
 
 const char *YLDISP_DRIVER_BASEDIR = "/sys/bus/usb/drivers/yealink/";
 const char *YLDISP_INPUT_BASE = "/dev/input/event";
@@ -62,6 +63,8 @@ typedef struct yldisp_data_s {
   
   time_t counter_base;
   int wait_date_after_count;
+  
+  int ring_off_delayed;
 } yldisp_data_t;
 
 
@@ -477,7 +480,7 @@ yl_store_type_t get_yldisp_store_type() {
 
 #define RINGTONE_MAXLEN 256
 #define RING_DIR ".yeaphone/ringtone"
-void set_yldisp_set_ringtone(char *ringname, unsigned char volume)
+void set_yldisp_ringtone(char *ringname, unsigned char volume)
 {
   int fd_in;
   unsigned char ringtone[RINGTONE_MAXLEN];
@@ -485,6 +488,11 @@ void set_yldisp_set_ringtone(char *ringname, unsigned char volume)
   char *ringfile;
   char *home;
 
+  /* make sure the buzzer is turned off! */
+  if (yp_ml_remove_event(-1, YLDISP_MINRING_ID) > 0) {
+    yld_write_control_file(&yldisp_data, "hide_icon", "RINGTONE");
+    usleep(10000);   /* urgh! TODO: Get rid of the delay! */
+  }
   /* ringname may be either a path relative to RINGDIR or an absolute path */
   home = getenv("HOME");
   if (home && (ringname[0] != '/')) {
@@ -527,10 +535,38 @@ void set_yldisp_set_ringtone(char *ringname, unsigned char volume)
 }
 
 
-void set_yldisp_ringer(yl_ringer_state_t rs) {
-  yld_write_control_file(&yldisp_data,
-                         (rs == YL_RINGER_ON) ? "show_icon" : "hide_icon",
-                         "RINGTONE");
+void yldisp_minring_callback(int id, int group, void *private_data) {
+  yldisp_data_t *yld_ptr = private_data;
+  if (yld_ptr->ring_off_delayed) {
+    yld_write_control_file(yld_ptr, "hide_icon", "RINGTONE");
+    yld_ptr->ring_off_delayed = 0;
+  }
+}
+
+void set_yldisp_ringer(yl_ringer_state_t rs, int minring) {
+  switch (rs) {
+    case YL_RINGER_ON:
+      if (yp_ml_remove_event(-1, YLDISP_MINRING_ID) > 0) {
+        yld_write_control_file(&yldisp_data, "hide_icon", "RINGTONE");
+        usleep(10000);   /* urgh! TODO: Get rid of the delay! */
+      }
+      yldisp_data.ring_off_delayed = 0;
+      yp_ml_schedule_timer(YLDISP_MINRING_ID, minring,
+                           yldisp_minring_callback, &yldisp_data);
+      yld_write_control_file(&yldisp_data, "show_icon", "RINGTONE");
+      break;
+    case YL_RINGER_OFF_DELAYED:
+      if (yp_ml_count_events(-1, YLDISP_MINRING_ID) > 0)
+        yldisp_data.ring_off_delayed = 1;
+      else
+        yld_write_control_file(&yldisp_data, "hide_icon", "RINGTONE");
+      break;
+    case YL_RINGER_OFF:
+      yld_write_control_file(&yldisp_data, "hide_icon", "RINGTONE");
+      yp_ml_remove_event(-1, YLDISP_MINRING_ID);
+      yldisp_data.ring_off_delayed = 0;
+      break;
+  }
 }
 
 yl_ringer_state_t get_yldisp_ringer() {
@@ -555,6 +591,7 @@ char *get_yldisp_text() {
 
 
 void yldisp_hide_all() {
+  set_yldisp_ringer(YL_RINGER_OFF, 0);
   yldisp_led_off();
   yldisp_stop_counter();
   yld_write_control_file(&yldisp_data, "line1", "                 ");
