@@ -224,15 +224,13 @@ static void load_custom_ringtone(const char *callernum)
 /***********************************/
 
 /* callerid to minimum ring duration in [ms] */
-static int callerid2minring(const char *callernum)
+static int callerid2minring(const char *dialnum)
 {
-  const char *dialnum;
   char *calleridkey;
   char *keyprefix = "minring_";
   char *minring_str;
   int minring = 0;
   
-  dialnum = (callernum && callernum[0]) ? callernum : "default";
   calleridkey = malloc(strlen(keyprefix) + strlen(dialnum) + 1);
   strcpy(calleridkey, keyprefix);
   strcat(calleridkey, dialnum);
@@ -240,10 +238,29 @@ static int callerid2minring(const char *callernum)
   free(calleridkey);
   if (minring_str) {
     minring = atoi(minring_str);
-    if (minring < 0)
+    if (minring >= 0)
+      minring *= 1000;
+    else
       minring = 0;
   }
-  return (minring * 1000);
+  else
+    minring = -1;
+
+  return minring;
+}
+
+static int get_custom_minring(const char *callernum)
+{
+  int minring;
+
+  if (callernum && strlen(callernum))
+    minring = callerid2minring(callernum);
+  if (minring < 0)
+    minring = callerid2minring("default");
+  if (minring < 0)
+    minring = 0;
+
+  return minring;
 }
 
 /***********************************/
@@ -599,7 +616,7 @@ void lps_callback(struct _LinphoneCore *lc,
          * This seems to be a limitation of the hardware */
         usleep(170000);
       }
-      set_yldisp_ringer(YL_RINGER_ON, callerid2minring(ylcontrol_data.callernum));
+      set_yldisp_ringer(YL_RINGER_ON, get_custom_minring(ylcontrol_data.callernum));
       break;
       
     case GSTATE_CALL_IN_CONNECTED:
