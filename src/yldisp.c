@@ -344,7 +344,7 @@ static inline int yld_read_control_file(yldisp_data_t *yld_ptr,
 
 /*****************************************************************/
 
-const static char *model_strings[] = { "P1K", "P4K", "B2K", "P1KH", "Unknown" };
+const static char *model_strings[] = { "Unknown", "P1K", "P4K", "B2K", "P1KH" };
 
 static void yldisp_determine_model()
 {

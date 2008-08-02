@@ -205,7 +205,8 @@ void lpcontrol_timer_callback(int id, int group, void *private_data) {
 /*****************************************************************/
 
 void lpstates_callback_wrapper(struct _LinphoneCore *lc,
-                               LinphoneGeneralState *gstate) {
+                               LinphoneGeneralState *gstate)
+{
   if (gstate->new_state == GSTATE_POWER_OFF)
     yp_ml_remove_event(-1, LPCONTROL_TIMER_ID);
 
@@ -215,13 +216,22 @@ void lpstates_callback_wrapper(struct _LinphoneCore *lc,
 
 /*****************************************************************/
 
-void set_lpstates_callback(GeneralStateChange callback) {
+void set_lpstates_callback(GeneralStateChange callback) 
+{
   lpstates_data.callback = callback;
 }
 
 /*****************************************************************/
 
-void lpstates_submit_command(lpstates_command_t command, char *arg) {
+void set_call_received_callback(InviteReceivedCb callback)
+{
+  lpc_vtable.inv_recv = callback;
+}
+
+/*****************************************************************/
+
+void lpstates_submit_command(lpstates_command_t command, char *arg)
+{
   char *cp = arg;
   int level;
   yl_models_t model;

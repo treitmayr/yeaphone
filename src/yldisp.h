@@ -35,11 +35,11 @@ typedef enum { YL_RINGER_OFF,
                YL_RINGER_ON } yl_ringer_state_t;
 
 typedef enum {
+        YL_MODEL_UNKNOWN,
         YL_MODEL_P1K,
         YL_MODEL_P4K,
         YL_MODEL_B2K,
-        YL_MODEL_P1KH,
-        YL_MODEL_UNKNOWN } yl_models_t;
+        YL_MODEL_P1KH } yl_models_t;
 
 
 void yldisp_init();
