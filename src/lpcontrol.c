@@ -42,6 +42,7 @@
 #include "mediastreamer2/mediastream.h"
 */
 #include "lpcontrol.h"
+#include "yldisp.h"
 #include "ypmainloop.h"
 
 #ifdef HAVE_CONFIG_H
@@ -223,6 +224,7 @@ void set_lpstates_callback(GeneralStateChange callback) {
 void lpstates_submit_command(lpstates_command_t command, char *arg) {
   char *cp = arg;
   int level;
+  yl_models_t model;
   
   /*printf("command %d with arg '%s'\n", command, arg);*/
   
@@ -232,6 +234,11 @@ void lpstates_submit_command(lpstates_command_t command, char *arg) {
                                     lpcontrol_timer_callback, &lpstates_data);
       linphone_core_init(&(lpstates_data.core_state), lpstates_data.vtable,
                          lpstates_data.configfile_name, &lpstates_data);
+      model = get_yldisp_model();
+      if ((model == YL_MODEL_P1K) || (model == YL_MODEL_P1KH)) {
+        /* we use the ringer on the handset */
+        linphone_core_set_ring(&(lpstates_data.core_state), "/dev/null");
+      }
       break;
       
     case LPCOMMAND_SHUTDOWN:
