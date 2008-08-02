@@ -680,9 +680,15 @@ void ylcontrol_io_callback(int id, int group, void *private_data) {
   bytes = read(ylc_ptr->evfd, &event, sizeof(struct input_event));
 
   if (bytes != (int) sizeof(struct input_event)) {
-    fprintf(stderr, "control_proc: Expected %d bytes, got %d bytes\n",
-            sizeof(struct input_event), bytes);
-    abort();
+    if (bytes < 0)
+      perror("Error reading from event device");
+    else
+      fprintf(stderr, "%s: Expected %d bytes, got %d bytes\n", __FUNCTION__,
+              sizeof(struct input_event), bytes);
+    close(ylc_ptr->evfd);
+    /* remove myself and shut down */
+    yp_ml_remove_event(-1, YLCONTROL_IO_ID);
+    stop_ylcontrol();
   }
 
   if (event.type == 1) {        /* key */
