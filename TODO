@@ -1,8 +1,54 @@
+Proposal for Yeaphone's Configuration:
+--------------------------------------
+The number of text files is slowly turning configuration into a mess, so
+I [thomas] propose the following:
+
+* The main configuration file lives in $HOME/.yeaphone and contains a global
+  section as well as a separate section for each known phone number or SIP ID,
+  eg.
+vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+[global]
+intl-access-code        00
+natl-access-code        0
+country-code    43
+ringtone   default-p1k
+#history-file  .. use default
+phonebook-file /var/tmp/yeaphone-history
+exec-on-missed   send-mail-missed-call
+history-merge-numbers
+
+[023456789]
+display "Bolek"
+
+[sip:7788@sip.provider.net]
+display "Ala"
+dial sip:ala@home.dyndns.org    << also acts as alias to 7788@..??
+
+[*doorbell*]
+display "doorbell"
+dial sip:intercom@localhost:5061
+exec-on-incoming   ring-garden-bell
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+This file would never be written by the program.
+
+* Then there would be a phonebook and a history file (or both in one file?),
+  which would be updated by the program or by hand. The phonebook should be a
+  text file similar to the main config file, eg.
+
+1  sip:7788@sip.provider.net
+2  sip:*doorbell*@localhost:5061
+99 sip:time@localhost:5061
+
+The history file would only be appended when written to. It should probably be
+a binary file (just like Rafal's) to allow easier random access when read.
+This way only the required entry could be read which reduces the consumption of
+main memory. It should contain the SIP URL of the caller or callee, the start
+time and duration of the call, the direction (incoming/outgoing) of the call
+and the status (missed/taken/rejected/error?).
+
+
 Future Features:
 ----------------
-* use just one thread for display timing, schedule according to
-  pending time-outs. Resolution <= 50ms (?),
-  use gettimeofday
 
 * store the complete SIP URL for last calls and stored calls
 
@@ -15,8 +61,6 @@ Future Features:
   the calls history should be stored in a configurable file
   (so it can also be placed on a RAM drive)
   
-* whenever registration fails, restart the blinking LED
-
 * allow to associate shell commands for each state change,
   eg. to turn down volume when there is an incoming call or
   to send an email when a call was missed.
@@ -29,4 +73,15 @@ Future Features:
   various features and to present the calls history
 
 * support different Yealink models
+
+* support multiple instances of Yeaphone which involves
+  - If all are run by the same user, then yeaphone and liblinphone will have
+    to be persuaded to read a different configuration file for each yeaphone
+    instance.
+  - The Yealink devices have to be distinguished, at best by the device's
+    internal hardware version and serial number. An updated yealink kernel
+    module is required for that.
+  - Yeaphone would have to override linphone's soundcard settings to use the
+    correct ALSA card.
+
 
