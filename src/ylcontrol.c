@@ -139,10 +139,10 @@ void extract_callernum(ylcontrol_data_t *ylc_ptr, const char *line) {
           intl = 1;
         }
 
-        /* check if 'num' consists of numbers only */
+        /* check if 'num' consists of numbers and * # only */
         ptr = num;
         while (ptr && *ptr) {
-          if (*ptr > '9' || *ptr < '0')
+          if ((*ptr > '9' || *ptr < '0') && (*ptr != '*' && *ptr != '#'))
             ptr = NULL;
           else
             ptr++;
