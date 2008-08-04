@@ -29,6 +29,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <fcntl.h>
+#include <ctype.h>
 #include <assert.h>
 #include <linux/input.h>
 
@@ -142,10 +143,10 @@ void extract_callernum(ylcontrol_data_t *ylc_ptr, const char *line) {
         /* check if 'num' consists of numbers and * # only */
         ptr = num;
         while (ptr && *ptr) {
-          if ((*ptr > '9' || *ptr < '0') && (*ptr != '*' && *ptr != '#'))
-            ptr = NULL;
-          else
+          if (isalnum(*ptr) || ispunct(*ptr))
             ptr++;
+          else
+            ptr = NULL;
         }
         if (!ptr || !*num) {
           /* we found other characters -> skip this string */
@@ -178,7 +179,7 @@ void extract_callernum(ylcontrol_data_t *ylc_ptr, const char *line) {
     }
     osip_from_free(url);
     if (line1)
-     free(line1);
+      free(line1);
   }
   
   /*printf("callernum=%s\n", ylc_ptr->callernum);*/
