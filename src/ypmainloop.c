@@ -28,7 +28,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
-#include <strings.h>
+//#include <strings.h>
 #include <errno.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -41,8 +41,16 @@
 #endif
 
 
-#define INITIAL_EV_LIST_SIZE  6
+#define INITIAL_EV_LIST_SIZE 10
 #define TIMER_MIN_RESOLUTIN  10         /* in [ms] */
+
+
+#define TIMEVAL_TO_MS(tv) (((tv)->tv_sec * 1000L) + ((tv)->tv_usec / 1000))
+#define MS_TO_TIMEVAL(ms, tv) \
+  do { \
+    (tv)->tv_sec = (ms) / 1000; \
+    (tv)->tv_usec = ((ms) % 1000) * 1000L; \
+  } while (0)
 
 
 enum event_type {
@@ -54,10 +62,11 @@ enum event_type {
 
 struct event_list {
   enum event_type type;
+  int event_id;
   int group_id;
   int fd;
-  int interval;
-  struct timeval tv;
+  struct timeval interval;
+  struct timeval expire;
   yp_ml_callback callback;
   void *callback_data;
   int processed;
@@ -65,7 +74,9 @@ struct event_list {
 
 struct ml_data_s {
   struct event_list *ev_list;
-  int ev_list_size;
+  int ev_list_used;
+  int ev_list_allocated;
+  int event_id_max;
 
   fd_set select_master_set;
   int select_max_fd;
@@ -90,15 +101,17 @@ int yp_ml_init()
     abort();
   }*/
 
-  bzero(&ml_data, sizeof(ml_data));
+  memset(&ml_data, 0, sizeof(ml_data));
 
   /* preallocate event list */
-  ml_data.ev_list_size = INITIAL_EV_LIST_SIZE;
-  ml_data.ev_list = calloc(ml_data.ev_list_size, sizeof(ml_data.ev_list[0]));
+  ml_data.ev_list_used = 0;
+  ml_data.ev_list_allocated = INITIAL_EV_LIST_SIZE;
+  ml_data.ev_list = calloc(ml_data.ev_list_allocated, sizeof(ml_data.ev_list[0]));
   if (!ml_data.ev_list) {
     fprintf(stderr, "Cannot allocate memory for event list\n");
     return -ENOMEM;
   }
+  ml_data.event_id_max = 0;
 
   ret = pipe(fd);
   if (ret != 0) {
@@ -125,7 +138,6 @@ int yp_ml_run()
   /*fd_set write_set;*/
   fd_set except_set;
   struct timeval tv, now;
-  long usec;
   int ret, index, i;
   int result;
 
@@ -141,17 +153,15 @@ int yp_ml_run()
     /* find the timer to expire next */
     tv.tv_sec = 0;
     current = ml_data.ev_list;
-    for (i = 0; i < ml_data.ev_list_size; i++, current++) {
+    for (i = 0; i < ml_data.ev_list_used; i++, current++) {
       if ((current->type == EV_TYPE_TIMER) ||
           (current->type == EV_TYPE_PTIMER)) {
         if ((tv.tv_sec == 0) ||
-            (current->tv.tv_sec < tv.tv_sec) ||
-            ((current->tv.tv_sec == tv.tv_sec) &&
-             (current->tv.tv_usec < tv.tv_usec))) {
-          tv.tv_sec = current->tv.tv_sec;
-          tv.tv_usec = current->tv.tv_usec;
+            timercmp(&current->expire, &tv, <)) {
+          tv.tv_sec = current->expire.tv_sec;
+          tv.tv_usec = current->expire.tv_usec;
         }
-        /* reset 'processed' flag (used below) */
+        /* reset all 'processed' flags (used below) */
         current->processed = 0;
       }
     }
@@ -161,16 +171,11 @@ int yp_ml_run()
       tv.tv_usec = 0;
     }
     else {
+      /* calculate the duration to wait in 'select' */
       gettimeofday(&now, NULL);
-      tv.tv_sec -= now.tv_sec;
-      tv.tv_usec -= now.tv_usec;
-      if (tv.tv_usec < 0) {
-        tv.tv_sec--;
-        tv.tv_usec += 1000000L;
-      }
-      if ((tv.tv_sec < 0)  ||
-          ((tv.tv_sec == 0) &&
-           (tv.tv_usec < (TIMER_MIN_RESOLUTIN * 1000L)))) {
+      timersub(&tv, &now, &tv);      /* tv -= now */
+      if ((tv.tv_sec < 0)  || (tv.tv_usec < 0)) {
+        /* timer already expired -> 'select' will not wait */
         tv.tv_sec = 0;
         tv.tv_usec = 0;
       }
@@ -187,7 +192,7 @@ int yp_ml_run()
     if (ret > 0) {
       /* io event */
       current = ml_data.ev_list;
-      for (i = 0; i < ml_data.ev_list_size; i++, current++) {
+      for (i = 0; i < ml_data.ev_list_used; i++, current++) {
         if ((current->type == EV_TYPE_IO) &&
             (current->callback != NULL) &&
             (FD_ISSET(current->fd, &read_set) ||
@@ -218,31 +223,26 @@ int yp_ml_run()
     gettimeofday(&now, NULL);
     
     /* apply the minimum resolution */
-    usec = (long) now.tv_usec + (TIMER_MIN_RESOLUTIN * 1000L);
-    if (usec > 1000000L) {
-      usec -= 1000000L;
+    now.tv_usec += TIMER_MIN_RESOLUTIN * 1000L;
+    if (now.tv_usec > 1000000L) {
+      now.tv_usec -= 1000000L;
       now.tv_sec++;
     }
-    now.tv_usec = usec;
-    
+
     /* run callbacks for timer events (in correct order!) */
     do {
       index = -1;
       tv.tv_sec = 0;
       current = ml_data.ev_list;
-      for (i = 0; i < ml_data.ev_list_size; i++, current++) {
+      for (i = 0; i < ml_data.ev_list_used; i++, current++) {
         if (!current->processed &&
             ((current->type == EV_TYPE_TIMER) ||
              (current->type == EV_TYPE_PTIMER))) {
-          if ((current->tv.tv_sec < now.tv_sec) ||
-              ((current->tv.tv_sec == now.tv_sec) &&
-               (current->tv.tv_usec <= now.tv_usec))) {
+          if (timercmp(&current->expire, &now, <=)) {
             if ((tv.tv_sec == 0) ||
-                (current->tv.tv_sec < tv.tv_sec) ||
-                ((current->tv.tv_sec == tv.tv_sec) &&
-                 (current->tv.tv_usec < tv.tv_usec))) {
-              tv.tv_sec = current->tv.tv_sec;
-              tv.tv_usec = current->tv.tv_usec;
+                timercmp(&current->expire, &tv, <)) {
+              tv.tv_sec = current->expire.tv_sec;
+              tv.tv_usec = current->expire.tv_usec;
               index = i;
             }
           }
@@ -254,19 +254,23 @@ int yp_ml_run()
         if (current->type == EV_TYPE_TIMER) {
           /* remove timer */
           current->type = EV_TYPE_EMPTY;
+          /* try to reduce the number of "used" entries */
+          if (index + 1 == ml_data.ev_list_used) {
+            for (i = index; i >= 0; i--) {
+              if (ml_data.ev_list[i].type != EV_TYPE_EMPTY)
+                break;
+              ml_data.ev_list_used--;
+            }
+          }
         }
         else {
           /* reschedule timer */
+          timeradd(&current->expire, &current->interval, &current->expire);
           /* TODO: What happens if we were suspended for a while? */
-          current->tv.tv_sec += (current->interval / 1000);
-          current->tv.tv_usec += ((long) (current->interval % 1000) * 1000L);
-          if (current->tv.tv_usec > 1000000L) {
-            current->tv.tv_sec++;
-            current->tv.tv_usec -= 1000000L;
-          }
         }
         if (current->callback) {
-          current->callback(index, ml_data.ev_list[index].group_id,
+          current->callback(ml_data.ev_list[index].event_id,
+                            ml_data.ev_list[index].group_id,
                             current->callback_data);
         }
       }
@@ -277,8 +281,10 @@ int yp_ml_run()
   close(ml_data.wakeup_read);
   
   /* Free memory */
-  ml_data.ev_list_size = 0;
+  ml_data.ev_list_allocated = 0;
+  ml_data.ev_list_used = 0;
   free(ml_data.ev_list);
+  ml_data.event_id_max = 0;
   FD_ZERO(&ml_data.select_master_set);
   ml_data.select_max_fd = 0;
   
@@ -298,56 +304,159 @@ int yp_ml_shutdown()
 
 /*****************************************************************/
 
-static int yp_mlint_schedule_timer(int group_id, int delay,
-                                   yp_ml_callback cb, void *private_data,
-                                   enum event_type type)
+struct event_list *get_free_entry(int *index)
 {
-  struct event_list *empty;
-  int event_id;
-  int i;
+  struct event_list *entry;
+  int i, idx;
   
-  empty = NULL;
-  for (i = 0; i < ml_data.ev_list_size; i++) {
+  entry = NULL;
+  for (i = 0; i < ml_data.ev_list_used; i++) {
     if (ml_data.ev_list[i].type == EV_TYPE_EMPTY) {
-      empty = &(ml_data.ev_list[i]);
-      event_id = i;
+      entry = &(ml_data.ev_list[i]);
+      idx = i;
       break;
     }
   }
-  if (empty == NULL) {
-    struct event_list *new_base;
-    
-    fprintf(stderr, "extending event list\n");
-    event_id = ml_data.ev_list_size;
-    ml_data.ev_list_size++;
-    new_base = realloc(ml_data.ev_list,
-                       ml_data.ev_list_size * sizeof(ml_data.ev_list[0]));
-    if (new_base == NULL) {
-      fprintf(stderr, "Cannot extend size of event list");
-      return -ENOMEM;
+  if (entry == NULL) {
+    if (ml_data.ev_list_used >= ml_data.ev_list_allocated) {
+      struct event_list *new_base;
+      fprintf(stderr, "extending event list\n");
+      ml_data.ev_list_allocated += 3;        /* add 3 records (2 spare) */
+      new_base = realloc(ml_data.ev_list,
+                         ml_data.ev_list_allocated * sizeof(ml_data.ev_list[0]));
+      if (new_base == NULL) {
+        fprintf(stderr, "Cannot extend size of event list");
+        return NULL;
+      }
+      ml_data.ev_list = new_base;
     }
-    ml_data.ev_list = new_base;
-    empty = &(new_base[event_id]);
+    idx = ml_data.ev_list_used++;
+    entry = &(ml_data.ev_list[idx]);
   }
+  if (index)
+    *index = idx;
+  return entry;
+}
+
+/*****************************************************************/
+
+/* Returns the number of periods of tm_check until the timers
+ * overlap.
+ * 0 .. there is no (reasonable) overlap detected.
+ * 1 .. a perfect match, every tick overlaps with tm_exist
+ * >1 .. every X ticks overlap.
+ */
+static inline int timer_overlap_score(int tm_check,
+                                      struct timeval *tv_exist)
+{
+  int tm_exist = TIMEVAL_TO_MS(tv_exist);
+  int i;
+  if (!tm_check || !tm_exist) {
+    /* invalid durations */
+    return 0;
+  }
+  if (tm_check == tm_exist) {
+    /* same interval */
+    return 1;
+  }
+  if (tm_exist > tm_check) {
+    for (i = 1; i <= 4; i++)
+      if ((tm_exist * i) % tm_check == 0)
+        return (tm_exist * i) / tm_check;
+  }
+  else {  /* tm_exist < tm_check */
+    for (i = 1; i <= 4; i++)
+      if ((tm_check * i) % tm_exist == 0)
+        return i;
+  }
+  return 0;
+}
+
+/*****************************************************************/
+
+static int yp_mlint_schedule_timer(int group_id, int delay,
+                                   int allow_optimize,
+                                   yp_ml_callback cb, void *private_data,
+                                   enum event_type type)
+{
+  struct event_list *entry;
+  struct timeval now;
+  int index, i;
+  int score, best_score, best_index;
   
-  empty->type = type;
-  empty->group_id = group_id;
-  empty->processed = 1;
-  empty->interval = delay;
-  empty->callback = cb;
-  empty->callback_data = private_data;
+  entry = get_free_entry(&index);
+  if (entry == NULL)
+    return -ENOMEM;
+
+  entry->type = type;
+  entry->event_id = ++ml_data.event_id_max;
+  entry->group_id = group_id;
+  entry->processed = 1;
+  MS_TO_TIMEVAL(delay, &entry->interval);
+  entry->fd = 0;
+  entry->callback = cb;
+  entry->callback_data = private_data;
   
-  gettimeofday(&empty->tv, NULL);
-  empty->tv.tv_sec += (delay / 1000);
-  empty->tv.tv_usec += ((long) (delay % 1000) * 1000L);
-  if (empty->tv.tv_usec >= 1000000L) {
-    empty->tv.tv_sec++;
-    empty->tv.tv_usec -= 1000000L;
+  gettimeofday(&now, NULL);
+
+  best_index = -1;
+  if (allow_optimize) {
+    for (i = 0; i < ml_data.ev_list_used; i++) {
+      if (i == index)
+        continue;
+      if (ml_data.ev_list[i].type == EV_TYPE_PTIMER) {
+        score = timer_overlap_score(delay, &ml_data.ev_list[i].interval);
+        if (score == 0)
+          continue;
+        if (score == 1) {
+          /* found perfect match */
+          best_index = i;
+          break;
+        }
+        if ((best_index < 0) || (score < best_score)) {
+          best_score = score;
+          best_index = i;
+        }
+      }
+    }
+  }
+  if (best_index >= 0) {
+    struct timeval *tv_ref = &ml_data.ev_list[best_index].expire;
+    struct timeval tv_diff;
+    int ms_diff;
+    
+    entry->expire.tv_sec = tv_ref->tv_sec;
+    entry->expire.tv_usec = tv_ref->tv_usec;
+    
+    if (timercmp(tv_ref, &now, >)) {
+      /* reference expires in the future (regular case) */
+      timersub(tv_ref, &now, &tv_diff);
+      ms_diff = TIMEVAL_TO_MS(&tv_diff);
+      ms_diff = (ms_diff / delay) * delay;
+      if (ms_diff > 0) {
+        /* rewind by 'ms_diff' milliseconds */
+        MS_TO_TIMEVAL(ms_diff, &tv_diff);
+        timersub(&entry->expire, &tv_diff, &entry->expire); /* expire -= diff */
+      }
+    }
+    else {
+      /* reference already expired */
+      timersub(&now, tv_ref, &tv_diff);
+      ms_diff = TIMEVAL_TO_MS(&tv_diff);
+      ms_diff = ((ms_diff / delay) + 1) * delay;
+      /* advance by 'msdiff' milliseconds */
+      MS_TO_TIMEVAL(ms_diff, &tv_diff);
+      timeradd(&entry->expire, &tv_diff, &entry->expire);   /* expire += diff */
+    }
+  }
+  else {
+    /* no optimization: expire = now + interval */
+    timeradd(&now, &entry->interval, &entry->expire);
   }
   
   write(ml_data.wakeup_write, &i, 1);
 
-  return event_id;
+  return entry->event_id;
 }
 
 /*****************************************************************/
@@ -355,17 +464,28 @@ static int yp_mlint_schedule_timer(int group_id, int delay,
 int yp_ml_schedule_timer(int group_id, int delay,
                          yp_ml_callback cb, void *private_data)
 {
-  return yp_mlint_schedule_timer(group_id, delay, cb, private_data,
+  return yp_mlint_schedule_timer(group_id, delay, 0, cb, private_data,
                                  EV_TYPE_TIMER);
 }
 
 /*****************************************************************/
 
 int yp_ml_schedule_periodic_timer(int group_id, int interval,
+                                  int allow_optimize,
                                   yp_ml_callback cb, void *private_data)
 {
-  return yp_mlint_schedule_timer(group_id, interval, cb, private_data,
+  return yp_mlint_schedule_timer(group_id, interval, allow_optimize,
+                                 cb, private_data,
                                  EV_TYPE_PTIMER);
+}
+
+/*****************************************************************/
+
+int yp_ml_reschedule_periodic_timer(int event_id, int interval,
+                                    int allow_optimize)
+{
+  fprintf(stderr, "%s not yet implemented!\n", __FUNCTION__);
+  abort();
 }
 
 /*****************************************************************/
@@ -373,46 +493,27 @@ int yp_ml_schedule_periodic_timer(int group_id, int interval,
 int yp_ml_poll_io(int group_id, int fd,
                   yp_ml_callback cb, void *private_data)
 {
-  struct event_list *empty;
-  int event_id;
+  struct event_list *entry;
   int i;
   
-  empty = NULL;
-  for (i = 0; i < ml_data.ev_list_size; i++) {
-    if (ml_data.ev_list[i].type == EV_TYPE_EMPTY) {
-      empty = &(ml_data.ev_list[i]);
-      event_id = i;
-      break;
-    }
-  }
-  if (empty == NULL) {
-    struct event_list *new_base;
-    
-    fprintf(stderr, "extending event list\n");
-    event_id = ml_data.ev_list_size;
-    ml_data.ev_list_size++;
-    new_base = realloc(ml_data.ev_list,
-                       ml_data.ev_list_size * sizeof(ml_data.ev_list[0]));
-    if (new_base == NULL) {
-      fprintf(stderr, "Cannot extend size of event list");
-      return -ENOMEM;
-    }
-    ml_data.ev_list = new_base;
-    empty = &(new_base[event_id]);
-  }
-  empty->type = EV_TYPE_IO;
-  empty->group_id = group_id;
-  empty->fd = fd;
-  empty->callback = cb;
-  empty->callback_data = private_data;
+  entry = get_free_entry(NULL);
+  if (entry == NULL)
+    return -ENOMEM;
+
+  entry->type = EV_TYPE_IO;
+  entry->event_id = ++ml_data.event_id_max;
+  entry->group_id = group_id;
+  entry->fd = fd;
+  entry->callback = cb;
+  entry->callback_data = private_data;
 
   FD_SET(fd, &ml_data.select_master_set);
   if (ml_data.select_max_fd <= fd)
     ml_data.select_max_fd = fd + 1;
   
-  write(ml_data.wakeup_write, &fd, 1);
+  write(ml_data.wakeup_write, &i, 1);
   
-  return event_id;
+  return entry->event_id;
 }
 
 /*****************************************************************/
@@ -425,16 +526,24 @@ int yp_ml_remove_event(int event_id, int group_id)
   int i;
   struct event_list *current;
   
-  current = ml_data.ev_list;
-  for (i = 0; i < ml_data.ev_list_size; i++, current++) {
+  current = &ml_data.ev_list[ml_data.ev_list_used - 1];
+  for (i = ml_data.ev_list_used; i > 0 ; i--, current--) {
     if ((current->type != EV_TYPE_EMPTY) &&
-        ((event_id < 0) || (event_id == i)) &&
+        ((event_id < 0) || (current->event_id == i)) &&
         ((group_id < 0) || (current->group_id == group_id))) {
       if (current->type == EV_TYPE_IO) {
         FD_CLR(current->fd, &ml_data.select_master_set);
         need_wakeup = 1;
       }
-      current->type = EV_TYPE_EMPTY;
+      if (i == ml_data.ev_list_used) {
+        /* last entry -> shrink the list */
+        ml_data.ev_list_used--;
+        printf("shrink list\n");
+      }
+      else {
+        /* other entry -> mark empty */
+        current->type = EV_TYPE_EMPTY;
+      }
       count++;
     }
     else
@@ -453,6 +562,8 @@ int yp_ml_remove_event(int event_id, int group_id)
   return count;
 }
 
+/*****************************************************************/
+
 int yp_ml_count_events(int event_id, int group_id)
 {
   int count = 0;
@@ -460,9 +571,9 @@ int yp_ml_count_events(int event_id, int group_id)
   struct event_list *current;
   
   current = ml_data.ev_list;
-  for (i = 0; i < ml_data.ev_list_size; i++, current++) {
+  for (i = 0; i < ml_data.ev_list_used; i++, current++) {
     if ((current->type != EV_TYPE_EMPTY) &&
-        ((event_id < 0) || (event_id == i)) &&
+        ((event_id < 0) || (current->event_id == i)) &&
         ((group_id < 0) || (current->group_id == group_id))) {
       count++;
     }

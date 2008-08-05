@@ -13,7 +13,7 @@
 .\" along with this program; see the file COPYING.  If not, write to
 .\" the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
 .\"
-.TH YEAPHONE 1 "July 20, 2008"
+.TH YEAPHONE 1 "August 3, 2008"
 .\" Please update the above date whenever this man page is modified.
 .\"
 .\" Some roff macros, for reference:
@@ -117,7 +117,7 @@ can be used to place and receive calls.
 The various keys have the following functions:
 
    1. before a phone call
-          * 0-9
+          * 0-9,*,#
             Dial a phone number
           * C
             Remove the last character of the dialed number
@@ -127,7 +127,7 @@ The various keys have the following functions:
             Remove the complete number
           * <green key>
             Initiate the call
-          * # + <0-9>
+          * <up key> + <0-9>
             No number dialed yet: Recall and display a number from
             memory X
             Number already dialed: Store the currently displayed number
@@ -140,7 +140,7 @@ The various keys have the following functions:
           * VOL+/-
             Adjust the speaker's volume 
    3. after a phone call (with the last number displayed)
-          * 0-9
+          * 0-9,*,#
             Dial a new phone number
           * C
             Remove the complete number
@@ -148,7 +148,7 @@ The various keys have the following functions:
             Remove the complete number
           * <green key>
             Redial the last number
-          * # + <0-9>
+          * <up key> + <0-9>
             Store the last number to memory /X/ 
    4. when the phone rings
           * #
@@ -167,6 +167,20 @@ needs some adjustments in the file \fB~/.yeaphonerc\fP. After terminating
 yeaphone the parameters \fBintl-access-code\fP, \fBnatl-access-code\fP, and
 \fBcountry-code\fP should be changed accordingly, the default values work for
 Austria only.
+
+In \fB~/.yeaphonerc\fP you can also spedify custom ringtones for different
+numbers by adding lines according to the following example:
+  ringtone_default   /usr/share/yeaphone/ringtones/default_p1k.bin
+  ringtone_01234567  /usr/share/yeaphone/ringtones/special_p1k.bin
+  ringtone_0555777   doorbell_p1k.bin
+
+If you specify relative paths to the ringtones, they are based on
+$HOME/.yeaphone/ringtone.
+
+Another feature to be configured in \fB~/.yeaphonerc\fP is the minimum ring
+duration. If for a certain caller ID the duration of the ring should be at
+least 5 seconds, this can be specified as:
+  minring_01234567  5
 
 .SH OPTIONS
 \fByeaphone\fP does not accept any options.

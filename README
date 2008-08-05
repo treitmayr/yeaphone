@@ -183,10 +183,15 @@ In ~/.yeaphonerc you can also spedify custom ringtones for different
 numbers by adding lines according to the following example:
   ringtone_default   /usr/share/yeaphone/ringtones/default_p1k.bin
   ringtone_01234567  /usr/share/yeaphone/ringtones/special_p1k.bin
-  ringtone_0555777   /usr/share/yeaphone/ringtones/special_p1k.bin
+  ringtone_0555777   doorbell_p1k.bin
 
 If you specify relative paths to the ringtones, they are based on
 $HOME/.yeaphone/ringtone.
+
+Another feature to be configured in ~/.yeaphonerc is the minimum ring
+duration. If for a certain caller ID the duration of the ring should be at
+least 5 seconds, this can be specified as:
+  minring_01234567  5
 
 For security reasons Yeaphone should not be run as user "root". You
 could create a new group called "voip" on your system and make sure that
