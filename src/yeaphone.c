@@ -42,10 +42,12 @@
 #define CONFIG_FILE ".yeaphonerc"
 
 char *mycode = "43";   /* default to Austria ;) */
-
+char *uniq;
 
 void parse_args(int argc, char **argv) {
   char *arg;
+  
+  uniq = NULL;
   
   while (argc--) {
     arg = *(argv++);
@@ -53,6 +55,10 @@ void parse_args(int argc, char **argv) {
         !strcmp(arg, "--help")) {
       printf("Usage: yeaphone\n");
       exit(1);
+    }
+    else
+    if (!strncmp(arg, "--id=", 5)) {
+      uniq = strdup(arg+5);
     }
     /*else
     if (!strncmp(arg, "--mycode=", 9)) {
@@ -96,8 +102,11 @@ int main(int argc, char **argv) {
   read_config();
   
   yp_ml_init();
+  lpcontrol_init();
   
-  yldisp_init();
+  if (yldisp_init(uniq) != 0)
+    return 1;
+  
   init_ylcontrol(mycode);
   
   start_lpcontrol(1, NULL);

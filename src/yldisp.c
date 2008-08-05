@@ -58,6 +58,9 @@ typedef struct yldisp_data_s {
   char *path_event;
   char *path_buf;
   
+  int alsa_cardp;
+  int alsa_cardc;
+  
   yl_models_t model;
   int led_inverted;
   
@@ -153,99 +156,274 @@ int cmp_inputdir(const char *dirname, void *priv) {
           isdigit(dirname[strlen(s)]));
 }
 
-void yldisp_init() {
-  char *symlink;
-  char *dirname;
+int cmp_dir(const char *dirname, void *priv) {
+  return (dirname && !strcmp(dirname, (char *) priv));
+}
+
+int cmp_pcmlink(const char *dirname, void *priv) {
+  const char *devptr;
+  char cardtype = ((char *)priv)[0];
+  int len = strlen(dirname);
+  if (len < 10)
+    return 0;
+  if (cardtype != dirname[len - 1])
+    return 0;
+  devptr = &dirname[strlen(dirname) - 3];
+  return (!strncmp(dirname, "sound:pcmC", 10) &&
+          (!strncmp(devptr, "D0p", 3) || !strncmp(devptr, "D0c", 3)));
+}
+
+/*****************************************************************/
+
+static int check_input_dir(const char *idir, const char *uniq) {
+  char *symlink, *dirname, *evnum;
   int plen;
-  char *evnum;
   struct stat event_stat;
-  
+  int ret = 0;
+
   yldisp_data.path_sysfs = NULL;
   yldisp_data.path_event = NULL;
   yldisp_data.path_buf   = NULL;
-  
-  dirname = find_dirent(YLDISP_DRIVER_BASEDIR, cmp_devlink, NULL);
-  if (!dirname) {
-    fprintf(stderr, "Please connect your handset first!\n");
-    abort();
-  }
-  plen = strlen(YLDISP_DRIVER_BASEDIR) + strlen(dirname) + 10;
+  symlink = NULL;
+
+  plen = strlen(YLDISP_DRIVER_BASEDIR) + strlen(idir) + 10;
   yldisp_data.path_sysfs = malloc(plen);
   if (!yldisp_data.path_sysfs) {
     perror("__FILE__/__LINE__: malloc");
-    abort();
+    ret = -ENOMEM;
+    goto free_and_leave;
   }
   strcpy(yldisp_data.path_sysfs, YLDISP_DRIVER_BASEDIR);
-  strcat(yldisp_data.path_sysfs, dirname);
+  strcat(yldisp_data.path_sysfs, idir);
   strcat(yldisp_data.path_sysfs, "/");
-  free(dirname);
   printf("path_sysfs = %s\n", yldisp_data.path_sysfs);
   
   /* allocate buffer for sysfs interface path */
-  yldisp_data.path_buf = malloc(plen + 20);
+  yldisp_data.path_buf = malloc(plen + 50);
   if (!yldisp_data.path_buf) {
     perror("__FILE__/__LINE__: malloc");
-    abort();
+    ret = -ENOMEM;
+    goto free_and_leave;
   }
   strcpy(yldisp_data.path_buf, yldisp_data.path_sysfs);
   
-  evnum = NULL;
+  /* allocate some buffer we can work with */
   symlink = malloc(plen + 50);
   if (!symlink) {
     perror("__FILE__/__LINE__: malloc");
-    abort();
+    ret = -ENOMEM;
+    goto free_and_leave;
   }
+  evnum = NULL;
+
+  /* first get the 'input:inputX' link to find the 'uniq' file */
   strcpy(symlink, yldisp_data.path_sysfs);
-  dirname = find_dirent(symlink, cmp_eventlink, NULL);
+  dirname = find_dirent(symlink, cmp_inputdir, "input:input");
   if (dirname) {
-    evnum = get_num_ptr(dirname);
-  }
-  if (!evnum) {
-    dirname = find_dirent(symlink, cmp_inputdir, "input:input");
-    if (dirname) {
-      strcat(symlink, dirname);
-      free(dirname);
-      dirname = find_dirent(symlink, cmp_eventlink, NULL);
-      if (dirname) {
-        evnum = get_num_ptr(dirname);
-      }
-    }
-  }
-  if (!evnum) {
-    strcat(symlink, "input/");
-    dirname = find_dirent(symlink, cmp_inputdir, "input");
-    if (dirname) {
-      strcat(symlink, dirname);
-      free(dirname);
-      dirname = find_dirent(symlink, cmp_eventlink, NULL);
-      if (dirname) {
-        evnum = get_num_ptr(dirname);
-      }
-    }
-  }
-  if (evnum) {
-    yldisp_data.path_event = malloc(strlen(YLDISP_INPUT_BASE) +
-                                    strlen(evnum) + 4);
-    strcpy(yldisp_data.path_event, YLDISP_INPUT_BASE);
-    strcat(yldisp_data.path_event, evnum);
+    strcat(symlink, dirname);
     free(dirname);
-    printf("path_event = %s\n", yldisp_data.path_event);
+    if (uniq && *uniq) {
+      int match = 0;
+      char uniq_str[40];
+      int len;
+      FILE *fp;
+      
+      strcat(symlink, "/uniq");
+      fp = fopen(symlink, "r");
+      if (fp) {
+        len = fread(uniq_str, 1, sizeof(uniq_str), fp);
+        fclose(fp);
+        uniq_str[len] = '\0';
+        if ((len > 0) && (uniq_str[len - 1] < ' '))
+          uniq_str[--len] = '\0';       /* strip off \n */
+        match = !strcmp(uniq_str, uniq);
+        printf("device id \"%s\" ->%s match\n", uniq_str, (match) ? "" : " no");
+      }
+      if (!match) {
+        ret = 0;
+        goto free_and_leave;
+      }
+      symlink[strlen(symlink) - 5] = '\0';     /* remove "/uniq" */
+    }
+    dirname = find_dirent(symlink, cmp_eventlink, NULL);
+    if (dirname) {
+      evnum = get_num_ptr(dirname);
+      if (!evnum) {
+        free(dirname);
+        fprintf(stderr, "Could not find the event number!\n");
+        ret = -ENOENT;
+        goto free_and_leave;
+      }
+    }
+    else {
+      fprintf(stderr, "Could not find the event link!\n");
+      ret = -ENOENT;
+      goto free_and_leave;
+    }
   }
   else {
-    fprintf(stderr, "Could not find the input event interface via %s!\n",
-            yldisp_data.path_sysfs);
-    abort();
+    fprintf(stderr, "Could not find the input:inputX!\n");
+    ret = -ENOENT;
+    goto free_and_leave;
   }
+  
+  yldisp_data.path_event = malloc(strlen(YLDISP_INPUT_BASE) +
+                                  strlen(evnum) + 4);
+  strcpy(yldisp_data.path_event, YLDISP_INPUT_BASE);
+  strcat(yldisp_data.path_event, evnum);
+  free(dirname);
+  printf("path_event = %s\n", yldisp_data.path_event);
 
   if (stat(yldisp_data.path_event, &event_stat)) {
     perror(yldisp_data.path_event);
-    abort();
+    ret = (errno > 0) ? -errno : -ENOENT;
+    goto free_and_leave;
   }
   if (!S_ISCHR(event_stat.st_mode)) {
     fprintf(stderr, "Error: %s is no character device\n",
             yldisp_data.path_event);
-    abort();
+    ret = -ENOENT;
+    goto free_and_leave;
   }
+
+  return 1;
+
+free_and_leave:
+  if (yldisp_data.path_event) {
+    free(yldisp_data.path_event);
+    yldisp_data.path_event = NULL;
+  }
+  if (yldisp_data.path_sysfs) {
+    free(yldisp_data.path_sysfs);
+    yldisp_data.path_sysfs = NULL;
+  }
+  if (yldisp_data.path_buf) {
+    free(yldisp_data.path_buf);
+    yldisp_data.path_buf = NULL;
+  }
+  if (symlink)
+    free(symlink);
+  return ret;
+}
+
+
+static int find_input_dir(const char *uniq) {
+  DIR *basedir_handle;
+  struct dirent *basedirent;
+  int ret = -ENOENT;
+  
+  basedir_handle = opendir(YLDISP_DRIVER_BASEDIR);
+  if (!basedir_handle) {
+    fprintf(stderr, "Please connect your handset first (driver not loaded)!\n");
+    return (errno > 0) ? -errno : -ENOENT;
+  }
+
+  while ((basedirent = readdir(basedir_handle))) {
+    if (!cmp_devlink(basedirent->d_name, NULL))
+      continue;
+    ret = check_input_dir(basedirent->d_name, uniq);
+    if (ret > 0)
+      break;
+    if (ret < 0)
+      return ret;
+  }
+  closedir(basedir_handle);
+  if (ret <= 0) {
+    fprintf(stderr, "Please connect your handset ");
+    if (uniq && *uniq)
+      fprintf(stderr, "with ID \"%s\" ", uniq);
+    fprintf(stderr, "first!\n");
+  }
+  return (ret > 0) ? 0: ret;
+}
+
+
+static int extract_card_number(char *cardstr)
+{
+  char *cardnum;
+  /* cut off last 3 characters */
+  cardstr[strlen(cardstr) - 3] = '\0';
+  /* get the card number */
+  cardnum = get_num_ptr(cardstr);
+  if (!cardnum) {
+    fprintf(stderr, "Could not determine ALSA card number from '%s'!\n",
+            cardstr);
+    return -ENOENT;
+  }
+  return atoi(cardnum);
+}
+
+
+static int find_alsa_card() {
+  DIR *dir_handle;
+  struct dirent *dirent;
+  char *dirname;
+  int found;
+
+  yldisp_data.alsa_cardc = -1;     /* capture */
+  yldisp_data.alsa_cardp = -1;     /* playback */
+  
+  if (!yldisp_data.path_sysfs)
+    return -ENOENT;
+
+  strcpy(yldisp_data.path_buf, yldisp_data.path_sysfs);
+  strcat(yldisp_data.path_buf, "../");
+
+  dir_handle = opendir(yldisp_data.path_buf);
+  if (!dir_handle) {
+    perror(yldisp_data.path_buf);
+    return (errno > 0) ? -errno : -ENOENT;
+  }
+
+  found = 0;
+  while (!found && (dirent = readdir(dir_handle))) {
+    if (!cmp_devlink(dirent->d_name, NULL))
+      continue;
+    strcpy(yldisp_data.path_buf, yldisp_data.path_sysfs);
+    strcat(yldisp_data.path_buf, "../");
+    strcat(yldisp_data.path_buf, dirent->d_name);
+    printf("%s\n", yldisp_data.path_buf);
+    
+    dirname = find_dirent(yldisp_data.path_buf, cmp_pcmlink, "p");
+    if (dirname) {
+      found = 1;
+      yldisp_data.alsa_cardp = extract_card_number(dirname);
+      free(dirname);
+    }
+    dirname = find_dirent(yldisp_data.path_buf, cmp_pcmlink, "c");
+    if (dirname) {
+      found = 1;
+      yldisp_data.alsa_cardc = extract_card_number(dirname);
+      free(dirname);
+    }
+  }
+  closedir(dir_handle);
+  
+  if ((yldisp_data.alsa_cardc < 0) || (yldisp_data.alsa_cardp < 0)) {
+    fprintf(stderr, "Could not find required sound cards!\n");
+    return -ENOENT;
+  }
+  return 0;
+}
+
+
+void yldisp_get_alsa_cards(int *cardp, int *cardc)
+{
+  if (cardp)
+    *cardp = yldisp_data.alsa_cardp;
+  if (cardc)
+    *cardc = yldisp_data.alsa_cardc;
+}
+
+/*****************************************************************/
+
+int yldisp_init(const char *uniq) {
+  int ret;
+  
+  if ((ret = find_input_dir(uniq)) != 0)
+    return ret;
+  if ((ret = find_alsa_card()) != 0);
+    return ret;
   
   yldisp_determine_model();
   

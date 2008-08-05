@@ -35,6 +35,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/time.h>
+#include <mediastreamer2/mssndcard.h>
 
 /* needed?
 #include "coreapi/exevents.h"
@@ -74,6 +75,8 @@ typedef struct lpcontrol_data_s {
   LinphoneCore core_state;
   
   char configfile_name[PATH_MAX];
+  
+  MSSndCard *sndcard;
   
 } lpcontrol_data_t;
 
@@ -230,11 +233,41 @@ void set_call_received_callback(InviteReceivedCb callback)
 
 /*****************************************************************/
 
+void override_soundcards()
+{
+  yl_models_t model;
+  int cardc, cardp;
+  char pcm_name[15];
+  
+  model = get_yldisp_model();
+
+  if (lpstates_data.sndcard != NULL)
+    ms_snd_card_destroy(lpstates_data.sndcard);
+
+  yldisp_get_alsa_cards(&cardp, &cardc);
+  
+  snprintf(pcm_name, sizeof(pcm_name), "plughw:%d", cardp);
+
+  lpstates_data.sndcard = ms_alsa_card_new_custom(pcm_name, pcm_name);
+  
+  lpstates_data.core_state.sound_conf.play_sndcard = 
+    lpstates_data.core_state.sound_conf.capt_sndcard = 
+      lpstates_data.core_state.sound_conf.ring_sndcard = lpstates_data.sndcard;
+  
+  printf("playback device = %s\n", linphone_core_get_playback_device(&(lpstates_data.core_state)));
+  
+  if ((model == YL_MODEL_P1K) || (model == YL_MODEL_P1KH)) {
+    /* we use the ringer on the handset */
+    linphone_core_set_ring(&(lpstates_data.core_state), "/dev/null");
+  }
+}
+
+/*****************************************************************/
+
 void lpstates_submit_command(lpstates_command_t command, char *arg)
 {
   char *cp = arg;
   int level;
-  yl_models_t model;
   
   /*printf("command %d with arg '%s'\n", command, arg);*/
   
@@ -244,11 +277,7 @@ void lpstates_submit_command(lpstates_command_t command, char *arg)
                                     lpcontrol_timer_callback, &lpstates_data);
       linphone_core_init(&(lpstates_data.core_state), lpstates_data.vtable,
                          lpstates_data.configfile_name, &lpstates_data);
-      model = get_yldisp_model();
-      if ((model == YL_MODEL_P1K) || (model == YL_MODEL_P1KH)) {
-        /* we use the ringer on the handset */
-        linphone_core_set_ring(&(lpstates_data.core_state), "/dev/null");
-      }
+      override_soundcards();
       break;
       
     case LPCOMMAND_SHUTDOWN:
@@ -312,6 +341,12 @@ void lpstates_submit_command(lpstates_command_t command, char *arg)
     default:
       break;
   }
+}
+
+/*****************************************************************/
+
+void lpcontrol_init() {
+  lpstates_data.sndcard = NULL;
 }
 
 /*****************************************************************/

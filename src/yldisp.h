@@ -42,10 +42,11 @@ typedef enum {
         YL_MODEL_P1KH } yl_models_t;
 
 
-void yldisp_init();
+int yldisp_init(const char *uniq);
 void yldisp_uninit();
 
 yl_models_t get_yldisp_model();
+void yldisp_get_alsa_cards(int *cardp, int *cardc);
 
 void yldisp_led_blink(unsigned int on_time, unsigned int off_time);
 void yldisp_led_off();

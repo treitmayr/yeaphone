@@ -46,6 +46,8 @@ typedef enum lpstates_command_e {
 } lpstates_command_t;
 
 
+void lpcontrol_init();
+
 void set_lpstates_callback(GeneralStateChange callback);
 void set_call_received_callback(InviteReceivedCb callback);
 
