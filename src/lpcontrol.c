@@ -240,7 +240,7 @@ void lpstates_submit_command(lpstates_command_t command, char *arg)
   
   switch (command) {
     case LPCOMMAND_STARTUP:
-      yp_ml_schedule_periodic_timer(LPCONTROL_TIMER_ID, 200,
+      yp_ml_schedule_periodic_timer(LPCONTROL_TIMER_ID, 200, 1,
                                     lpcontrol_timer_callback, &lpstates_data);
       linphone_core_init(&(lpstates_data.core_state), lpstates_data.vtable,
                          lpstates_data.configfile_name, &lpstates_data);

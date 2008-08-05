@@ -389,7 +389,7 @@ static void led_off_callback(int id, int group, void *private_data) {
     yld_ptr->blink_off_reschedule = 0;
     yp_ml_schedule_periodic_timer(YLDISP_BLINK_ID,
                                   yld_ptr->blink_on_time + yld_ptr->blink_off_time,
-                                  led_off_callback, private_data);
+                                  0, led_off_callback, private_data);
   }
   yld_write_control_file(yld_ptr,
                          (yldisp_data.led_inverted) ? "show_icon" : "hide_icon",
@@ -419,7 +419,7 @@ void yldisp_led_blink(unsigned int on_time, unsigned int off_time) {
       yp_ml_schedule_timer(YLDISP_BLINK_ID, off_time,
                            led_off_callback, &yldisp_data);
       yp_ml_schedule_periodic_timer(YLDISP_BLINK_ID, (on_time + off_time),
-                                    led_on_callback, &yldisp_data);
+                                    1, led_on_callback, &yldisp_data);
     }
   }
   else {
@@ -474,7 +474,7 @@ void yldisp_show_date() {
   else {
     show_date_callback(0, 0, &yldisp_data);
     yp_ml_schedule_periodic_timer(YLDISP_DATETIME_ID, 1000,
-                                  show_date_callback, &yldisp_data);
+                                  1, show_date_callback, &yldisp_data);
   }
 }
 
@@ -506,7 +506,7 @@ void yldisp_start_counter() {
   yldisp_data.counter_base = time(NULL);
   show_date_callback(0, 0, &yldisp_data);
   yp_ml_schedule_periodic_timer(YLDISP_DATETIME_ID, 1000,
-                                show_counter_callback, &yldisp_data);
+                                1, show_counter_callback, &yldisp_data);
 }
 
 

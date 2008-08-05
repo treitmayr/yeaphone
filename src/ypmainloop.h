@@ -37,7 +37,11 @@ int yp_ml_schedule_timer(int group_id, int delay,
                          yp_ml_callback cb, void *private_data);
 
 int yp_ml_schedule_periodic_timer(int group_id, int interval,
+                                  int allow_optimize,
                                   yp_ml_callback cb, void *private_data);
+
+int yp_ml_reschedule_periodic_timer(int event_id, int interval,
+                                    int allow_optimize);
 
 int yp_ml_poll_io(int group_id, int fd,
                   yp_ml_callback cb, void *private_data);
