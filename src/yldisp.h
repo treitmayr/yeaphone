@@ -39,6 +39,7 @@ typedef enum {
         YL_MODEL_P1K,
         YL_MODEL_P4K,
         YL_MODEL_B2K,
+        YL_MODEL_B3G,
         YL_MODEL_P1KH } yl_models_t;
 
 

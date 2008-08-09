@@ -422,12 +422,13 @@ int yldisp_init(const char *uniq) {
   
   if ((ret = find_input_dir(uniq)) != 0)
     return ret;
-  if ((ret = find_alsa_card()) != 0);
+  if ((ret = find_alsa_card()) != 0)
     return ret;
   
   yldisp_determine_model();
   
   yldisp_hide_all();
+  return 0;
 }
 
 /*****************************************************************/
@@ -522,7 +523,8 @@ static inline int yld_read_control_file(yldisp_data_t *yld_ptr,
 
 /*****************************************************************/
 
-const static char *model_strings[] = { "Unknown", "P1K", "P4K", "B2K", "P1KH" };
+const static char *model_strings[] = { "Unknown", "P1K", "P4K",
+                                       "B2K", "B3G", "P1KH" };
 
 static void yldisp_determine_model()
 {
@@ -544,6 +546,9 @@ static void yldisp_determine_model()
   else
   if (!strcmp(model_str, "B2K") || strstr(model_str, "*B2K"))
     yldisp_data.model = YL_MODEL_B2K;
+  else
+  if (!strcmp(model_str, "B3G"))
+    yldisp_data.model = YL_MODEL_B3G;
   else
     yldisp_data.model = YL_MODEL_UNKNOWN;
   
