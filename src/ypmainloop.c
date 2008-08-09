@@ -28,7 +28,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
-//#include <strings.h>
 #include <errno.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -144,6 +143,10 @@ int yp_ml_run()
   if (ml_data.is_running) {
     fprintf(stderr, "mainloop is already running\n");
     return 0;
+  }
+  if (ml_data.select_max_fd == 0) {
+    fprintf(stderr, "mainloop not initialized\n");
+    return -EFAULT;
   }
   ml_data.is_running = 1;
   result = 0;
@@ -277,28 +280,49 @@ int yp_ml_run()
     } while (index >= 0);
   }
   
-  close(ml_data.wakeup_write);
-  close(ml_data.wakeup_read);
-  
-  /* Free memory */
-  ml_data.ev_list_allocated = 0;
-  ml_data.ev_list_used = 0;
-  free(ml_data.ev_list);
-  ml_data.event_id_max = 0;
-  FD_ZERO(&ml_data.select_master_set);
-  ml_data.select_max_fd = 0;
+  if (result != 0)
+    yp_ml_shutdown();
   
   return result;
 }
 
 /*****************************************************************/
 
-int yp_ml_shutdown()
+int yp_ml_stop()
 {
   int is_running = ml_data.is_running;
   ml_data.is_running = 0;
   if (is_running)
     write(ml_data.wakeup_write, &ml_data, 1);    /* wake up mainloop */
+  return 0;
+}
+
+/*****************************************************************/
+
+int yp_ml_shutdown()
+{
+  ml_data.is_running = 0;
+
+  if (ml_data.wakeup_write >= 0) {
+    close(ml_data.wakeup_write);
+    ml_data.wakeup_write = -1;
+  }
+  if (ml_data.wakeup_read >= 0) {
+    close(ml_data.wakeup_read);
+    ml_data.wakeup_read = -1;
+  }
+
+  /* Free memory */
+  ml_data.ev_list_allocated = 0;
+  ml_data.ev_list_used = 0;
+  if (ml_data.ev_list) {
+    free(ml_data.ev_list);
+    ml_data.ev_list = NULL;
+  }
+  ml_data.event_id_max = 0;
+  FD_ZERO(&ml_data.select_master_set);
+  ml_data.select_max_fd = 0;
+
   return 0;
 }
 
@@ -538,7 +562,6 @@ int yp_ml_remove_event(int event_id, int group_id)
       if (i == ml_data.ev_list_used) {
         /* last entry -> shrink the list */
         ml_data.ev_list_used--;
-        printf("shrink list\n");
       }
       else {
         /* other entry -> mark empty */

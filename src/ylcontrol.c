@@ -36,6 +36,7 @@
 #include <linphone/linphonecore.h>
 #include <osipparser2/osip_message.h>
 #include "yldisp.h"
+#include "ylsysfs.h"
 #include "lpcontrol.h"
 #include "ylcontrol.h"
 #include "ypconfig.h"
@@ -526,7 +527,7 @@ void lps_callback(struct _LinphoneCore *lc,
   gstate_t lpstate_power;
   gstate_t lpstate_call;
   gstate_t lpstate_reg;
-  yl_models_t model;
+  ylsysfs_model model;
   
   /* make sure this is the same thread as our main loop! */
   assert(yp_ml_same_thread());
@@ -535,13 +536,13 @@ void lps_callback(struct _LinphoneCore *lc,
   lpstate_call = gstate_get_state(GSTATE_GROUP_CALL);
   lpstate_reg = gstate_get_state(GSTATE_GROUP_REG);
   
-  model = get_yldisp_model();
+  model = ylsysfs_get_model();
   
   switch (gstate->new_state) {
     case GSTATE_POWER_OFF:
       yldisp_hide_all();
       if (ylcontrol_data.hard_shutdown)
-        yp_ml_shutdown();
+        yp_ml_stop();
       else
         set_yldisp_text("   - off -  ");
       break;
@@ -631,7 +632,7 @@ void lps_callback(struct _LinphoneCore *lc,
       set_yldisp_call_type(YL_CALL_IN);
       yldisp_led_blink(300, 300);
 
-      if (get_yldisp_model() == YL_MODEL_P1K) {
+      if (model == YL_MODEL_P1K || model == YL_MODEL_P4K) {
         /* ringing seems to block displaying line 3,
          * so we have to wait for about 170ms.
          * This seems to be a limitation of the hardware */
@@ -774,12 +775,12 @@ void init_ylcontrol(char *countrycode) {
 /*************************************/
 
 void start_ylcontrol() {
-  char *path_event;
+  const char *path_event;
   
   ylcontrol_data.hard_shutdown = 0;
   ylcontrol_data.linphone_2_1_1_bug = 0;
   
-  path_event = get_yldisp_event_path();
+  path_event = ylsysfs_get_event_path();
   
   ylcontrol_data.evfd = open(path_event, O_RDONLY);
   if (ylcontrol_data.evfd < 0) {
@@ -805,7 +806,7 @@ void stop_ylcontrol() {
   if (gstate_get_state(GSTATE_GROUP_POWER) == GSTATE_POWER_OFF) {
     /* already powered off */
     yldisp_hide_all();
-    yp_ml_shutdown();
+    yp_ml_stop();
   }
   else {
     /* need to shut down first */

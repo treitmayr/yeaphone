@@ -31,6 +31,7 @@ typedef void (*yp_ml_callback)(int id, int group, void *private_data);
 
 int yp_ml_init();
 int yp_ml_run();
+int yp_ml_stop();
 int yp_ml_shutdown();
 
 int yp_ml_schedule_timer(int group_id, int delay,

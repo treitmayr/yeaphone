@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *  File: yldisp.h
+ *  File: ylsysfs.h
  *
  *  Copyright (C) 2006 - 2008  Thomas Reitmayr <treitmayr@devbase.at>
  *
@@ -24,44 +24,41 @@
  *
  ****************************************************************************/
 
-#ifndef YLDISP_H
-#define YLDISP_H
+#ifndef YLSYSFS_H
+#define YLSYSFS_H
 
-typedef enum { YL_CALL_NONE, YL_CALL_IN, YL_CALL_OUT } yl_call_type_t;
-typedef enum { YL_STORE_NONE, YL_STORE_ON } yl_store_type_t;
+typedef enum ylsysfs_model ylsysfs_model;
+enum ylsysfs_model {
+        YL_MODEL_UNKNOWN,
+        YL_MODEL_P1K,
+        YL_MODEL_P4K,
+        YL_MODEL_B2K,
+        YL_MODEL_B3G,
+        YL_MODEL_P1KH };
 
-typedef enum { YL_RINGER_OFF,
-               YL_RINGER_OFF_DELAYED,
-               YL_RINGER_ON } yl_ringer_state_t;
 
+int ylsysfs_find_device(const char *uniq);
 
-void yldisp_clear();
+const char *ylsysfs_get_sysfs_path();
+const char *ylsysfs_get_event_path();
 
-void yldisp_led_blink(unsigned int on_time, unsigned int off_time);
-void yldisp_led_off();
-void yldisp_led_on();
+ylsysfs_model ylsysfs_get_model();
+int ylsysfs_get_led_inverted();
+int ylsysfs_get_alsa_card();
 
-void yldisp_show_date();
-void yldisp_start_counter();
-void yldisp_stop_counter();
+int ylsysfs_write_control_file_buf(const char *control,
+                                   const char *buf,
+                                   int size);
 
-void set_yldisp_call_type(yl_call_type_t ct);
-yl_call_type_t get_yldisp_call_type();
+int ylsysfs_write_control_file(const char *control,
+                               const char *line);
 
-void set_yldisp_store_type(yl_store_type_t st);
-yl_store_type_t get_yldisp_store_type();
+int ylsysfs_read_control_file_buf(const char *control,
+                                  char *buf,
+                                  int size);
 
-void set_yldisp_ringtone(char *ringname, unsigned char volume);
-
-void set_yldisp_ringer(yl_ringer_state_t rs, int minring);
-yl_ringer_state_t get_yldisp_ringer();
-
-void yldisp_ringer_vol_up();
-void yldisp_ringer_vol_down();
-
-void set_yldisp_text(char *text);
-char *get_yldisp_text();
-
-void yldisp_hide_all();
+int ylsysfs_read_control_file(const char *control,
+                              char *line,
+                              int size);
 
 #endif

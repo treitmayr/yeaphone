@@ -44,6 +44,7 @@
 */
 #include "lpcontrol.h"
 #include "yldisp.h"
+#include "ylsysfs.h"
 #include "ypmainloop.h"
 
 #ifdef HAVE_CONFIG_H
@@ -87,7 +88,6 @@ typedef struct lpcontrol_data_s {
  *
  ***************************************************************************/
  
-void strtolower(char *str);
 static void lpc_dummy();
 static void lpc_display_something(LinphoneCore * lc, const char *something);
 static void lpc_display_status(LinphoneCore * lc, const char *something);
@@ -109,8 +109,6 @@ static void lpc_text_received(LinphoneCore *lc, LinphoneChatRoom *cr,
  *
  ***************************************************************************/
 
-lpcontrol_data_t lpstates_data;
-
 LinphoneCoreVTable lpc_vtable = {
   show:                   (ShowInterfaceCb) lpc_dummy,
   inv_recv:               lpc_call_received,
@@ -126,6 +124,12 @@ LinphoneCoreVTable lpc_vtable = {
   text_received:          lpc_text_received,
   general_state:          NULL
 };
+
+
+lpcontrol_data_t lpstates_data = {
+  sndcard: NULL
+};
+
 
 /***************************************************************************
  *
@@ -235,27 +239,28 @@ void set_call_received_callback(InviteReceivedCb callback)
 
 void override_soundcards()
 {
-  yl_models_t model;
-  int cardc, cardp;
+  ylsysfs_model model;
+  int card;
   char pcm_name[15];
   
-  model = get_yldisp_model();
+  model = ylsysfs_get_model();
 
   if (lpstates_data.sndcard != NULL)
     ms_snd_card_destroy(lpstates_data.sndcard);
 
-  yldisp_get_alsa_cards(&cardp, &cardc);
-  
-  snprintf(pcm_name, sizeof(pcm_name), "plughw:%d", cardp);
+  card = ylsysfs_get_alsa_card();
+  if (card >= 0) {
+    snprintf(pcm_name, sizeof(pcm_name), "plughw:%d", card);
+    lpstates_data.sndcard = ms_alsa_card_new_custom(pcm_name, pcm_name);
 
-  lpstates_data.sndcard = ms_alsa_card_new_custom(pcm_name, pcm_name);
-  
-  lpstates_data.core_state.sound_conf.play_sndcard = 
-    lpstates_data.core_state.sound_conf.capt_sndcard = 
-      lpstates_data.core_state.sound_conf.ring_sndcard = lpstates_data.sndcard;
-  
-  printf("playback device = %s\n", linphone_core_get_playback_device(&(lpstates_data.core_state)));
-  
+    lpstates_data.core_state.sound_conf.play_sndcard = 
+      lpstates_data.core_state.sound_conf.capt_sndcard = 
+        lpstates_data.core_state.sound_conf.ring_sndcard = lpstates_data.sndcard;
+
+    printf("playback device = %s\n",
+           linphone_core_get_playback_device(&(lpstates_data.core_state)));
+  }
+
   if ((model == YL_MODEL_P1K) || (model == YL_MODEL_P1KH)) {
     /* we use the ringer on the handset */
     linphone_core_set_ring(&(lpstates_data.core_state), "/dev/null");
@@ -341,12 +346,6 @@ void lpstates_submit_command(lpstates_command_t command, char *arg)
     default:
       break;
   }
-}
-
-/*****************************************************************/
-
-void lpcontrol_init() {
-  lpstates_data.sndcard = NULL;
 }
 
 /*****************************************************************/
