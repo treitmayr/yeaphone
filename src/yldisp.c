@@ -197,11 +197,15 @@ static void show_counter_callback(int id, int group, void *private_data) {
   ylsysfs_write_control_file("line2", "\t\t       ");
 }
 
-void yldisp_start_counter() {
+void yldisp_show_counter() {
   yp_ml_remove_event(-1, YLDISP_DATETIME_ID);
   module_data.wait_date_after_count = 1;
   module_data.counter_base = time(NULL);
-  show_date_callback(0, 0, NULL);
+  show_counter_callback(0, 0, NULL);
+}
+
+void yldisp_start_counter() {
+  yldisp_show_counter();
   yp_ml_schedule_periodic_timer(YLDISP_DATETIME_ID, 1000,
                                 1, show_counter_callback, NULL);
 }
@@ -375,6 +379,25 @@ char *get_yldisp_text() {
   return(NULL);
 }
 
+/*****************************************************************/
+
+void set_yldisp_pstn_mode(int enabled)
+{
+  ylsysfs_model model = ylsysfs_get_model();
+  if (model == YL_MODEL_B2K || model == YL_MODEL_B3G)
+    ylsysfs_write_control_file((enabled) ? "show_icon" : "hide_icon", "PSTN");
+}
+
+/*****************************************************************/
+
+void set_yldisp_dial_tone(int enabled)
+{
+  ylsysfs_model model = ylsysfs_get_model();
+  if (model == YL_MODEL_B2K || model == YL_MODEL_B3G || model == YL_MODEL_P4K)
+    ylsysfs_write_control_file((enabled) ? "show_icon" : "hide_icon", "DIALTONE");
+}
+
+/*****************************************************************/
 
 void yldisp_hide_all() {
   set_yldisp_ringer(YL_RINGER_OFF, 0);
@@ -383,6 +406,8 @@ void yldisp_hide_all() {
   ylsysfs_write_control_file("line1", "                 ");
   ylsysfs_write_control_file("line2", "         ");
   ylsysfs_write_control_file("line3", "            ");
+  set_yldisp_pstn_mode(1);
+  set_yldisp_dial_tone(0);
 }
 
 /*****************************************************************/

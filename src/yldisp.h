@@ -42,6 +42,7 @@ void yldisp_led_off();
 void yldisp_led_on();
 
 void yldisp_show_date();
+void yldisp_show_counter();
 void yldisp_start_counter();
 void yldisp_stop_counter();
 
@@ -61,6 +62,9 @@ void yldisp_ringer_vol_down();
 
 void set_yldisp_text(char *text);
 char *get_yldisp_text();
+
+void set_yldisp_pstn_mode(int pstn);
+void set_yldisp_dial_tone(int pstn);
 
 void yldisp_hide_all();
 

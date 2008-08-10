@@ -380,7 +380,7 @@ void handle_key(ylcontrol_data_t *ylc_ptr, int code, int value) {
           }
           break;
 
-        case 14:         /* C */
+        case 14:         /* KEY_BACKSPACE (C) */
           if (lpstate_power != GSTATE_POWER_ON)
             break;
           if (lpstate_call == GSTATE_CALL_IDLE &&
@@ -401,7 +401,7 @@ void handle_key(ylcontrol_data_t *ylc_ptr, int code, int value) {
           }
           break;
 
-        case 28:         /* pick up */
+        case 28:         /* KEY_ENTER (pick up) */
           if (lpstate_power != GSTATE_POWER_ON)
             break;
           if (lpstate_call == GSTATE_CALL_IDLE &&
@@ -451,7 +451,8 @@ void handle_key(ylcontrol_data_t *ylc_ptr, int code, int value) {
           }
           break;
         
-        case 105:        /* VOL- */
+        case 105:        /* KEY_LEFT (VOL-) */
+        case 114:        /* KEY_VOLUMEDOWN */
           if (lpstate_call == GSTATE_CALL_OUT_CONNECTED ||
               lpstate_call == GSTATE_CALL_IN_CONNECTED) {
             lpstates_submit_command(LPCOMMAND_SPKR_VOLDN, NULL);
@@ -463,7 +464,8 @@ void handle_key(ylcontrol_data_t *ylc_ptr, int code, int value) {
           }
           break;
         
-        case 106:        /* VOL+ */
+        case 106:        /* KEY_RIGHT (VOL+) */
+        case 115:        /* KEY_VOLUMEUP */
           if (lpstate_call == GSTATE_CALL_OUT_CONNECTED ||
               lpstate_call == GSTATE_CALL_IN_CONNECTED) {
             lpstates_submit_command(LPCOMMAND_SPKR_VOLUP, NULL);
@@ -646,19 +648,20 @@ void lps_callback(struct _LinphoneCore *lc,
       /* start timer */
       yldisp_start_counter();
       yldisp_led_blink(1000, 100);
-      /*yldisp_led_on();*/
       break;
       
     case GSTATE_CALL_OUT_INVITE:
       set_yldisp_call_type(YL_CALL_OUT);
       yldisp_led_blink(300, 300);
+      yldisp_show_counter();
       break;
       
     case GSTATE_CALL_OUT_CONNECTED:
-      /* start timer */
+      /* Unfortunately this state is sent already if early media is
+       * available. If the remote party picks up it is sent again, so
+       * the duration of the call is reset and displayed correctly. */
       yldisp_start_counter();
       yldisp_led_blink(1000, 100);
-      /*yldisp_led_on();*/
       break;
       
     case GSTATE_CALL_END:
