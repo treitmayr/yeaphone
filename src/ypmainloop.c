@@ -293,7 +293,7 @@ int yp_ml_stop()
   int is_running = ml_data.is_running;
   ml_data.is_running = 0;
   if (is_running)
-    write(ml_data.wakeup_write, &ml_data, 1);    /* wake up mainloop */
+    write(ml_data.wakeup_write, &is_running, 1);    /* wake up mainloop */
   return 0;
 }
 
@@ -478,7 +478,7 @@ static int yp_mlint_schedule_timer(int group_id, int delay,
     timeradd(&now, &entry->interval, &entry->expire);
   }
   
-  write(ml_data.wakeup_write, &i, 1);
+  write(ml_data.wakeup_write, &best_index, 1);
 
   return entry->event_id;
 }
@@ -518,7 +518,6 @@ int yp_ml_poll_io(int group_id, int fd,
                   yp_ml_callback cb, void *private_data)
 {
   struct event_list *entry;
-  int i;
   
   entry = get_free_entry(NULL);
   if (entry == NULL)
@@ -535,7 +534,7 @@ int yp_ml_poll_io(int group_id, int fd,
   if (ml_data.select_max_fd <= fd)
     ml_data.select_max_fd = fd + 1;
   
-  write(ml_data.wakeup_write, &i, 1);
+  write(ml_data.wakeup_write, &fd, 1);
   
   return entry->event_id;
 }

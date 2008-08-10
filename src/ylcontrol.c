@@ -729,6 +729,7 @@ void ylcontrol_io_callback(int id, int group, void *private_data) {
     /* remove myself and shut down */
     yp_ml_remove_event(-1, YLCONTROL_IO_ID);
     stop_ylcontrol();
+    event.type = 0;
   }
 
   if (event.type == 1) {        /* key */
