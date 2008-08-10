@@ -4,39 +4,55 @@
 #
 %define name yeaphone
 %define version @VERSION@
-%define release 1
+%define release 0%{?dist}
 %define manifest %{_builddir}/%{name}-%{version}-%{release}.manifest
 
 # required items
-Name: %{name}
-Version: %{version}
-Release: %{release}
-License: GPL
-Group: Application/Misc
+Name:		%{name}
+Version:	%{version}
+Release:	%{release}
+Summary:	A linphone frontend for external handset devices
+Group:		Application/Communication
+License:	GPL
 
 # optional items
 Vendor: Thomas Reitmayr
 #Distribution:
 #Icon:
-URL: http://www.devbase.at/
-Packager: Thomas Reitmayr <treitmayr@devbase.at>
+URL:		http://www.devbase.at/voip/yeaphone.php
+Packager:	Thomas Reitmayr <treitmayr@devbase.at>
 
 # source + patches
-Source: %{name}-%{version}.tar.gz
+Source:		http://download.devbase.at/voip/%{name}-%{version}.tar.gz
 #Source1:
 #Patch:
 #Patch1:
 
 # RPM info
 #Provides: 
-Requires: liblinphone2
+BuildRequires:  libosip2-devel
+BuildRequires:  linphone-devel >= 1.7.1
+BuildRequires:  ortp-devel >= 0.13.1
+
+BuildRequires:  readline-devel
+BuildRequires:  ncurses-devel
+
+BuildRequires:  alsa-lib-devel
+
+BuildRequires:  gsm-devel
+
+BuildRequires:  automake
+BuildRequires:  autoconf
+BuildRequires:  libtool
+BuildRequires:  intltool
+BuildRequires:  gettext
+
+#Requires: liblinphone2
 #Conflicts:
 #Prereq:
 
 #Prefix: /usr
-BuildRoot: /var/tmp/%{name}-%{version}
-
-Summary: A linphone frontend for external handset devices
+BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
 %description
 A linphone frontend for external handset devices
@@ -53,7 +69,7 @@ this case the handset).
 #%patch0 -p1
 
 %build
-%configure
+%configure --prefix=
 make
 
 %install
@@ -95,3 +111,9 @@ rm -rf $RPM_BUILD_ROOT
 #%config
 
 %changelog
+* Fri May 25 2007 Grant Parnell grant -at- everythinglinux.com.au 
+- Built this RPM for Fedora Core 6 against linphone-1.7.1-2.fc6
+* Thu Aug 07 2008 Thomas Reitmayr
+- Merged Grant's and my version of this file
+
+
