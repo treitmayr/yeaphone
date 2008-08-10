@@ -1,6 +1,6 @@
 ## Process this file with automake to produce Makefile.in
 
-INCLUDES = @LINPHONE_CFLAGS@
+yeaphone_CPPFLAGS = @LINPHONE_CFLAGS@
 
 # Program binary name
 bin_PROGRAMS = yeaphone
