@@ -66,6 +66,8 @@ typedef struct ylcontrol_data_s {
   char *intl_access_code;
   char *country_code;
   char *natl_access_code;
+
+  char *default_display;
   
   int hard_shutdown;
   int linphone_2_1_1_bug;
@@ -76,11 +78,12 @@ ylcontrol_data_t ylcontrol_data;
 /*****************************************************************/
 
 void display_dialnum(char *num) {
-  int len = strlen(num);
+  int len = (num) ? strlen(num) : 0;
   if (len < 12) {
     char buf[13];
     strcpy(buf, "            ");
-    strncpy(buf, num, len);
+    if (num)
+      strncpy(buf, num, len);
     set_yldisp_text(buf);
   }
   else {
@@ -394,9 +397,10 @@ void handle_key(ylcontrol_data_t *ylc_ptr, int code, int value) {
               if (len > 0) {
                 ylc_ptr->dialnum[len - 1] = '\0';
               }
+              display_dialnum((ylc_ptr->dialnum[0]) ?
+                              ylc_ptr->dialnum : ylc_ptr->default_display);
               ylc_ptr->dialback[0] = '\0';
               ylc_ptr->prep_recall = 0;
-              display_dialnum(ylc_ptr->dialnum);
             }
           }
           break;
@@ -447,7 +451,7 @@ void handle_key(ylcontrol_data_t *ylc_ptr, int code, int value) {
             ylc_ptr->prep_store = 0;
             ylc_ptr->prep_recall = 0;
             set_yldisp_store_type(YL_STORE_NONE);
-            display_dialnum("");
+            display_dialnum(ylc_ptr->default_display);
           }
           break;
         
@@ -502,7 +506,7 @@ void handle_long_key(ylcontrol_data_t *ylc_ptr, int code) {
         break;
       if (lpstate_call == GSTATE_CALL_IDLE) {
         ylcontrol_data.dialnum[0] = '\0';
-        display_dialnum("");
+        display_dialnum(ylcontrol_data.default_display);
       }
       break;
     
@@ -556,7 +560,7 @@ void lps_callback(struct _LinphoneCore *lc,
       break;
       
     case GSTATE_POWER_ON:
-      display_dialnum("");
+      display_dialnum(ylcontrol_data.default_display);
       break;
       
     case GSTATE_REG_FAILED:
@@ -587,7 +591,8 @@ void lps_callback(struct _LinphoneCore *lc,
         break;
       if (lpstate_call == GSTATE_CALL_IDLE) {
         if (ylcontrol_data.dialnum[0] == '\0') {
-          display_dialnum(ylcontrol_data.dialback);
+          display_dialnum((ylcontrol_data.dialback[0]) ?
+                     ylcontrol_data.dialback : ylcontrol_data.default_display);
         }
         yldisp_led_on();
       }
@@ -667,7 +672,8 @@ void lps_callback(struct _LinphoneCore *lc,
     case GSTATE_CALL_END:
       set_yldisp_ringer(YL_RINGER_OFF_DELAYED, 0);
       set_yldisp_call_type(YL_CALL_NONE);
-      display_dialnum(ylcontrol_data.dialback);
+      display_dialnum((ylcontrol_data.dialback[0]) ?
+                      ylcontrol_data.dialback : ylcontrol_data.default_display);
       yldisp_show_date();
       yldisp_led_on();
       break;
@@ -770,6 +776,8 @@ void init_ylcontrol(char *countrycode) {
     ypconfig_set_pair("country-code", ylcontrol_data.country_code);
     modified = 1;
   }
+  ylcontrol_data.default_display = ypconfig_get_value("display-id");
+
   if (modified) {
     /* write back modified configuration */
     ypconfig_write(NULL);
