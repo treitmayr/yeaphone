@@ -111,6 +111,19 @@ static char *get_num_ptr(char *s)
 
 /*****************************************************************/
 
+static char *rtrim_str(char *s)
+{
+  if (s && *s) {
+    char *p = s + strlen(s) - 1;
+    while ((p >= s) && (*p <= ' '))
+      p--;
+    p[1] = '\0';
+  }
+  return s;
+}
+
+/*****************************************************************/
+
 static int cmp_devlink(const char *dirname, void *priv)
 {
   (void) priv;
@@ -212,8 +225,7 @@ static int check_input_dir(const char *idir, const char *uniq)
         len = fread(uniq_str, 1, sizeof(uniq_str), fp);
         fclose(fp);
         uniq_str[len] = '\0';
-        while ((len > 0) && (uniq_str[len - 1] <= ' '))
-          uniq_str[--len] = '\0';       /* strip off \n */
+        rtrim_str(uniq_str);
         match = !strcmp(uniq_str, uniq);
         printf("device id \"%s\" ->%s match\n", uniq_str, (match) ? "" : " no");
       }
@@ -378,6 +390,8 @@ static void determine_model()
   len = ylsysfs_read_control_file("model", model_str, sizeof(model_str));
   module_data.led_inverted = ((len < 0) || (model_str[0] == ' ') ||
                                            (model_str[0] == '*'));
+  if (len > 0)
+    rtrim_str(model_str);
   if ((len < 0) || !strcmp(model_str, "P1K") || strstr(model_str, "*P1K"))
     module_data.model = YL_MODEL_P1K;
   else
