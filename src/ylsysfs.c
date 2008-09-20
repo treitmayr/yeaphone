@@ -155,12 +155,19 @@ static int cmp_pcmlink(const char *dirname, void *priv)
   unsigned card;
   int ret;
   ret = sscanf(dirname, "sound:pcmC%uD0[cp]", &card);
+  if (ret <= 0)
+    ret = sscanf(dirname, "pcmC%uD0[cp]", &card);
   if ((ret > 0) && priv)
     ((ylsysfs_data *)priv)->alsa_card = card;
   return (ret > 0);
 }
 
 /*****************************************************************/
+/* This function can handle the following sysfs layout variants:
+ * - /sys/bus/usb/drivers/yealink/1-1:1.3/input:input6/event6
+ * - /sys/bus/usb/drivers/yealink/1-1:1.3/input:input6/input:event6
+ * - /sys/bus/usb/drivers/yealink/1-1:1.3/input/input6/event6
+ */
 
 static int check_input_dir(const char *idir, const char *uniq)
 {
@@ -210,6 +217,14 @@ static int check_input_dir(const char *idir, const char *uniq)
   /* first get the 'input:inputX' link to find the 'uniq' file */
   strcpy(symlink, module_data.path_sysfs);
   dirname = find_dirent(symlink, cmp_inputdir, "input:input");
+  if (!dirname) {
+    dirname = find_dirent(symlink, cmp_dir, "input");
+    if (dirname) {
+      free(dirname);
+      strcat(symlink, "input/");
+      dirname = find_dirent(symlink, cmp_inputdir, "input");
+    }
+  }
   if (dirname) {
     strcat(symlink, dirname);
     free(dirname);
@@ -332,6 +347,10 @@ static int find_input_dir(const char *uniq)
 }
 
 /*****************************************************************/
+/* This function can handle the following sysfs layout variants:
+ * - /sys/bus/usb/drivers/yealink/1-1:1.3/../1-1:1.0/sound:pcmC1D0c
+ * - /sys/bus/usb/drivers/yealink/1-1:1.3/../1-1:1.0/sound/card1/pcmC1D0c
+ */
 
 static int find_alsa_card()
 {
@@ -361,8 +380,23 @@ static int find_alsa_card()
     strcpy(module_data.path_buf, module_data.path_sysfs);
     strcat(module_data.path_buf, "../");
     strcat(module_data.path_buf, dirent->d_name);
+    strcat(module_data.path_buf, "/");
     
     dirname = find_dirent(module_data.path_buf, cmp_pcmlink, &module_data);
+    if (!dirname) {
+      dirname = find_dirent(module_data.path_buf, cmp_dir, "sound");
+      if (dirname) {
+        free(dirname);
+        strcat(module_data.path_buf, "sound/");
+        dirname = find_dirent(module_data.path_buf, cmp_inputdir, "card");
+        if (dirname) {
+          strcat(module_data.path_buf, dirname);
+          strcat(module_data.path_buf, "/");
+          free(dirname);
+          dirname = find_dirent(module_data.path_buf, cmp_pcmlink, &module_data);
+        }
+      }
+    }
     if (dirname) {
       found = 1;
       free(dirname);
