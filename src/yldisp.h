@@ -66,6 +66,8 @@ char *get_yldisp_text();
 void set_yldisp_pstn_mode(int pstn);
 void set_yldisp_dial_tone(int pstn);
 
+void set_yldisp_backlight(int enabled);
+
 void yldisp_hide_all();
 
 #endif

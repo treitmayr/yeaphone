@@ -399,6 +399,15 @@ void set_yldisp_dial_tone(int enabled)
 
 /*****************************************************************/
 
+void set_yldisp_backlight(int enabled)
+{
+  ylsysfs_model model = ylsysfs_get_model();
+  if (model == YL_MODEL_P4K)
+    ylsysfs_write_control_file((enabled) ? "show_icon" : "hide_icon", "BACKLIGHT");
+}
+
+/*****************************************************************/
+
 void yldisp_hide_all() {
   set_yldisp_ringer(YL_RINGER_OFF, 0);
   yldisp_led_off();
@@ -408,6 +417,7 @@ void yldisp_hide_all() {
   ylsysfs_write_control_file("line3", "            ");
   set_yldisp_pstn_mode(1);
   set_yldisp_dial_tone(0);
+  set_yldisp_backlight(0);
 }
 
 /*****************************************************************/

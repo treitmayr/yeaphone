@@ -406,6 +406,7 @@ void handle_key(ylcontrol_data_t *ylc_ptr, int code, int value) {
           break;
 
         case 28:         /* KEY_ENTER (pick up) */
+          set_yldisp_backlight(1);
           if (lpstate_power != GSTATE_POWER_ON)
             break;
           if (lpstate_call == GSTATE_CALL_IDLE &&
@@ -434,6 +435,7 @@ void handle_key(ylcontrol_data_t *ylc_ptr, int code, int value) {
           break;
 
         case 1:          /* hang up */
+          set_yldisp_backlight(0);
           if (lpstate_power != GSTATE_POWER_ON)
             break;
           set_yldisp_ringer(YL_RINGER_OFF, 0);
@@ -638,8 +640,9 @@ void lps_callback(struct _LinphoneCore *lc,
       
       set_yldisp_call_type(YL_CALL_IN);
       yldisp_led_blink(300, 300);
+      set_yldisp_backlight(1);
 
-      if (model == YL_MODEL_P1K || model == YL_MODEL_P4K) {
+      if (model == YL_MODEL_P1K) {
         /* ringing seems to block displaying line 3,
          * so we have to wait for about 170ms.
          * This seems to be a limitation of the hardware */
@@ -676,6 +679,7 @@ void lps_callback(struct _LinphoneCore *lc,
                       ylcontrol_data.dialback : ylcontrol_data.default_display);
       yldisp_show_date();
       yldisp_led_on();
+      set_yldisp_backlight(0);
       break;
       
     case GSTATE_CALL_ERROR:
@@ -685,6 +689,7 @@ void lps_callback(struct _LinphoneCore *lc,
       set_yldisp_text(" - error -  ");
       yldisp_show_date();
       yldisp_led_on();
+      set_yldisp_backlight(0);
       break;
       
     default:
