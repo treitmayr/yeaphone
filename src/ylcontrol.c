@@ -55,6 +55,7 @@ typedef struct ylcontrol_data_s {
   
   int kshift;
   int pressed;
+  int off_hook;
   
   int prep_store;
   int prep_recall;
@@ -286,6 +287,8 @@ void handle_key(ylcontrol_data_t *ylc_ptr, int code, int value) {
     ylc_ptr->pressed = -1;
   }
   else {
+    if ((code == 169) && !value)     /* KEY_PHONE (pick up) */
+      code++;                        /* map "hang up" to 170 */
     ylc_ptr->pressed = (value) ? code : -1;
     if (value) {
       /*printf("key=%d\n", code);*/
@@ -356,6 +359,7 @@ void handle_key(ylcontrol_data_t *ylc_ptr, int code, int value) {
               }
               else {
                 /* we want to dial for an outgoing call */
+                set_yldisp_dial_tone(0);
                 if (len + 1 < sizeof(ylc_ptr->dialnum)) {
                   ylc_ptr->dialnum[len + 1] = '\0';
                   ylc_ptr->dialnum[len] = c;
@@ -397,16 +401,27 @@ void handle_key(ylcontrol_data_t *ylc_ptr, int code, int value) {
               if (len > 0) {
                 ylc_ptr->dialnum[len - 1] = '\0';
               }
-              display_dialnum((ylc_ptr->dialnum[0]) ?
-                              ylc_ptr->dialnum : ylc_ptr->default_display);
+              if (ylc_ptr->dialnum[0]) {
+                display_dialnum(ylc_ptr->dialnum);
+                if (ylc_ptr->off_hook)
+                  set_yldisp_dial_tone(1);
+              }
+              else {
+                display_dialnum(ylc_ptr->default_display);
+              }
               ylc_ptr->dialback[0] = '\0';
               ylc_ptr->prep_recall = 0;
             }
           }
           break;
 
-        case 28:         /* KEY_ENTER (pick up) */
+        case 169:        /* KEY_PHONE (pick up) */
+          ylc_ptr->off_hook = 1;
           set_yldisp_backlight(1);
+          set_yldisp_dial_tone(1);
+          break;
+
+        case 28:         /* KEY_ENTER (send) */
           if (lpstate_power != GSTATE_POWER_ON)
             break;
           if (lpstate_call == GSTATE_CALL_IDLE &&
@@ -417,6 +432,7 @@ void handle_key(ylcontrol_data_t *ylc_ptr, int code, int value) {
               strcpy(ylc_ptr->dialnum, ylc_ptr->dialback);
             }
             if (strlen(ylc_ptr->dialnum) > 0) {
+              set_yldisp_dial_tone(0);
               strcpy(ylc_ptr->dialback, ylc_ptr->dialnum);
               lpstates_submit_command(LPCOMMAND_CALL, ylc_ptr->dialnum);
               
@@ -434,8 +450,19 @@ void handle_key(ylcontrol_data_t *ylc_ptr, int code, int value) {
           }
           break;
 
-        case 1:          /* hang up */
+        case 170:        /* fake KEY_PHONE (hang up) */
+          ylc_ptr->off_hook = 0;
           set_yldisp_backlight(0);
+          set_yldisp_dial_tone(0);
+          if (lpstate_call == GSTATE_CALL_OUT_INVITE ||
+              lpstate_call == GSTATE_CALL_OUT_CONNECTED ||
+              lpstate_call == GSTATE_CALL_IN_INVITE ||
+              lpstate_call == GSTATE_CALL_IN_CONNECTED) {
+            lpstates_submit_command(LPCOMMAND_HANGUP, NULL);
+          }
+          break;
+
+        case 1:          /* hang up */
           if (lpstate_power != GSTATE_POWER_ON)
             break;
           set_yldisp_ringer(YL_RINGER_OFF, 0);
@@ -796,6 +823,7 @@ void start_ylcontrol() {
   
   ylcontrol_data.hard_shutdown = 0;
   ylcontrol_data.linphone_2_1_1_bug = 0;
+  ylcontrol_data.off_hook = 0;
   
   path_event = ylsysfs_get_event_path();
   
