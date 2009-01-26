@@ -418,10 +418,18 @@ void handle_key(ylcontrol_data_t *ylc_ptr, int code, int value) {
         case 169:        /* KEY_PHONE (pick up) */
           ylc_ptr->off_hook = 1;
           set_yldisp_backlight(1);
-          set_yldisp_dial_tone(1);
+          if (lpstate_call == GSTATE_CALL_IDLE &&
+              lpstate_reg  == GSTATE_REG_OK) {
+            set_yldisp_dial_tone(1);
+          }
+          else
+          if (lpstate_call == GSTATE_CALL_IN_INVITE) {
+            lpstates_submit_command(LPCOMMAND_PICKUP, NULL);
+          }
           break;
 
         case 28:         /* KEY_ENTER (send) */
+        case 31:         /* KEY_S (SEND on P4K) */
           if (lpstate_power != GSTATE_POWER_ON)
             break;
           if (lpstate_call == GSTATE_CALL_IDLE &&
