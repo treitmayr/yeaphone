@@ -46,6 +46,7 @@
 #include "yldisp.h"
 #include "ylsysfs.h"
 #include "ypmainloop.h"
+#include "ypconfig.h"
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -242,11 +243,14 @@ void override_soundcards()
   ylsysfs_model model;
   int card;
   char pcm_name[15];
+  char *ringer;
   
   model = ylsysfs_get_model();
 
   if (lpstates_data.sndcard != NULL)
     ms_snd_card_destroy(lpstates_data.sndcard);
+  
+  ringer = ypconfig_get_value("ringer-device");
 
   card = ylsysfs_get_alsa_card();
   if (card >= 0) {
@@ -254,14 +258,25 @@ void override_soundcards()
     lpstates_data.sndcard = ms_alsa_card_new_custom(pcm_name, pcm_name);
 
     lpstates_data.core_state.sound_conf.play_sndcard = 
-      lpstates_data.core_state.sound_conf.capt_sndcard = 
-        lpstates_data.core_state.sound_conf.ring_sndcard = lpstates_data.sndcard;
+      lpstates_data.core_state.sound_conf.capt_sndcard = lpstates_data.sndcard;
 
+    if (ringer) {
+      linphone_core_set_ringer_device(&(lpstates_data.core_state), ringer);
+      if (!lpstates_data.core_state.sound_conf.ring_sndcard) {
+        printf("Ringer device %s not found, falling back to handset's ringer\n");
+        lpstates_data.core_state.sound_conf.ring_sndcard = lpstates_data.sndcard;
+      }
+    }
+    else
+      lpstates_data.core_state.sound_conf.ring_sndcard = lpstates_data.sndcard;
+
+    printf("ringer device = %s\n",
+           linphone_core_get_ringer_device(&(lpstates_data.core_state)));
     printf("playback device = %s\n",
            linphone_core_get_playback_device(&(lpstates_data.core_state)));
   }
 
-  if ((model == YL_MODEL_P1K) || (model == YL_MODEL_P1KH)) {
+  if (!ringer && ((model == YL_MODEL_P1K) || (model == YL_MODEL_P1KH))) {
     /* we use the ringer on the handset */
     linphone_core_set_ring(&(lpstates_data.core_state), "/dev/null");
   }
