@@ -13,7 +13,7 @@
 .\" along with this program; see the file COPYING.  If not, write to
 .\" the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
 .\"
-.TH YEAPHONE 1 "August 3, 2008"
+.TH YEAPHONE 1 "January 27, 2009"
 .\" Please update the above date whenever this man page is modified.
 .\"
 .\" Some roff macros, for reference:
@@ -27,7 +27,7 @@
 .\" .sp <n>    insert n+1 empty lines
 .\" for manpage-specific macros, see man(7)
 .SH NAME
-yeaphone \- A SIP phone for Yealink USB-P1K handsets using liblinphone
+yeaphone \- A SIP phone for Yealink USB-P1K/P1KH/P4K handsets using liblinphone
 .SH SYNOPSIS
 .B yeaphone
 .RI [ options ]
@@ -52,14 +52,6 @@ to a VoIP provider.
 .PP
     root@NSLU2:~# \fBlinphonec\fP
     Ready
-    linphonec> \fBsoundcard list\fP
-    0: ALSA: default device
-    1: ALSA: USB Audio
-    2: ALSA: VOIP USB Phone
-    3: OSS: /dev/dsp
-    4: OSS: /dev/dsp1
-    linphonec> \fBsoundcard use 2\fP
-    Using sound device ALSA: VOIP USB Phone
     linphonec> \fBproxy add\fP
     Adding new proxy setup. Hit ^D to abort.
     Enter proxy sip address: \fBsip:sipgate.at\fP
@@ -84,8 +76,9 @@ to a VoIP provider.
     linphonec>
 
 Using linphonec the VoIP connection can be tested immediately before
-using Yeaphone. The speaker and microphone of the Yealink handset can be
-used already, commands still have to be entered through the PC keyboard
+using Yeaphone. For the speaker and microphone the default audio card
+is used, and 
+commands still have to be entered through the PC keyboard
 though. The most important commands of linphonec are:
 
     * help [<command>]
@@ -100,12 +93,13 @@ though. The most important commands of linphonec are:
     * quit
       unregisters at the VoIP provider and quits linphonec
 
-As soon as calls can be make this way, linphonec can be stopped and
+As soon as calls can be made this way, linphonec can be stopped and
 yeaphone can be invoked. Its output should look similar to this:
 
     root@NSLU2:~# \fByeaphone\fP
     path_sysfs = /sys/bus/usb/drivers/yealink/3-1.3:1.3/
     path_buf = /dev/input/event2
+    Detected handset Yealink USB-P1K
     Ready
     Registration on sip:sipgate.at sucessful.
 
@@ -114,7 +108,7 @@ display, a quick sequence of status messages appear, and finally the
 lower part of the display should be empty. Now the handset's keyboard
 can be used to place and receive calls.
 
-The various keys have the following functions:
+The various keys of a P1K/P1KH have the following functions:
 
    1. before a phone call
           * 0-9,*,#
@@ -162,14 +156,17 @@ The various keys have the following functions:
             Start and stop the VoIP connection (corresponds to turning
             on/off a phone) 
 
+For a P4K (desk phone) the keys have the same meaning, except that starting and
+finishing a phone call is done by picking up or hanging up the handset.
+
 To correctly understand the phone number of incoming calls, Yeaphone
 needs some adjustments in the file \fB~/.yeaphonerc\fP. After terminating
 yeaphone the parameters \fBintl-access-code\fP, \fBnatl-access-code\fP, and
 \fBcountry-code\fP should be changed accordingly, the default values work for
 Austria only.
 
-In \fB~/.yeaphonerc\fP you can also spedify custom ringtones for different
-numbers by adding lines according to the following example:
+In \fB~/.yeaphonerc\fP you can also spedify custom ringtones (P1K/P1KH only)
+for different numbers by adding lines according to the following example:
   ringtone_default   /usr/share/yeaphone/ringtones/default_p1k.bin
   ringtone_01234567  /usr/share/yeaphone/ringtones/special_p1k.bin
   ringtone_0555777   doorbell_p1k.bin
@@ -182,8 +179,25 @@ duration. If for a certain caller ID the duration of the ring should be at
 least 5 seconds, this can be specified as:
   minring_01234567  5
 
+If the ringtone of a P4K should be sent to a different audio device, the name of this
+device (preceeded by "ALSA: ") can
+be specified by the option below. Note that the wav-file to be played is still
+set in \fB~/.linphonerc\fP.
+  ringer-device  ALSA: USB Audio
+
 .SH OPTIONS
-\fByeaphone\fP does not accept any options.
+.TP
+\fI\-\-id=<id>\fP
+Attach to the device with an ID <id>.
+.TP
+\fI\-w, \-\-wait=[<sec>]\fP
+Check for the handset every <sec> seconds (default: 10s)
+.TP
+\fI\-v, \-\-verbose\fP
+Show debug messages.
+.TP
+\fI\-h, \-\-help\fP
+Print this help message.
 
 .SH FILES
 .I ~/.linphonerc
