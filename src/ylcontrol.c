@@ -282,248 +282,256 @@ void handle_key(ylcontrol_data_t *ylc_ptr, int code, int value) {
   lpstate_call = gstate_get_state(GSTATE_GROUP_CALL);
   lpstate_reg = gstate_get_state(GSTATE_GROUP_REG);
   
-  if (code == 42) {     /* left shift */
-    ylc_ptr->kshift = value;
-    ylc_ptr->pressed = -1;
+  /* preprocess the key codes */
+  switch (code) {
+    case 42:              /* left shift */
+      ylc_ptr->kshift = value;
+      ylc_ptr->pressed = -1;
+      value = 0;
+      break;
+    case 169:             /* KEY_PHONE */
+      if (!value)
+        code++;           /* map "hang up" to 170 */
+      value = 1;
+      break;
+    default:
+      ylc_ptr->pressed = (value) ? code : -1;
+      break;
   }
-  else {
-    if ((code == 169) && !value)     /* KEY_PHONE (pick up) */
-      code++;                        /* map "hang up" to 170 */
-    ylc_ptr->pressed = (value) ? code : -1;
-    if (value) {
-      /*printf("key=%d\n", code);*/
-      switch (code) {
-        case 2:       /* '1'..'9' */
-        case 3:
-        case 4:
-        case 5:
-        case 6:
-        case 7:
-        case 8:
-        case 9:
-        case 10:
-        case 11:      /* '0' */
-        case 55:      /* '*' */
-        case 103:     /* UP */
-          if (lpstate_power != GSTATE_POWER_ON)
-            break;
-          /* get the real character */
-          c = (code == 55) ? '*' :
-              (code == 4 && ylc_ptr->kshift) ? '#' :
-              (code == 11) ? '0' : ('0' + code - 1);
 
-          if (lpstate_call == GSTATE_CALL_IDLE &&
-              lpstate_reg  == GSTATE_REG_OK) {
-            int len = strlen(ylc_ptr->dialnum);
-            
-            if (code == 103) {
-              /* store/recall (cursor up) */
-              if ((len > 0) || ylc_ptr->dialback[0]) {
-                /* prepare to store the currently displayed number */
-                ylc_ptr->prep_store = 1;
-                set_yldisp_store_type(YL_STORE_ON);
-              }
-              else {
-                /* prepare to recall a number */
-                ylc_ptr->prep_recall = 1;
-                set_yldisp_text("  select    ");
-              }
-            }
-            else
-            if ((c >= '0' && c <= '9') || c == '*' || c == '#') {
-              if (ylc_ptr->prep_store) {
-                /* store number */
-                char *key;
-                key = strdup("mem ");
-                key[3] = c;
-                ypconfig_set_pair(key, (len) ? ylc_ptr->dialnum : ylc_ptr->dialback);
-                free(key);
-                ypconfig_write(NULL);
-                ylc_ptr->prep_store = 0;
-                set_yldisp_store_type(YL_STORE_NONE);
-              }
-              else
-              if (ylc_ptr->prep_recall) {
-                /* recall number but do not dial yet */
-                char *key;
-                char *val;
-                key = strdup("mem ");
-                key[3] = c;
-                val = ypconfig_get_value(key);
-                if (val && *val) {
-                  strncpy(ylc_ptr->dialback, val, MAX_NUMBER_LEN);
-                }
-                free(key);
-                ylc_ptr->prep_recall = 0;
-                display_dialnum(ylc_ptr->dialback);
-              }
-              else {
-                /* we want to dial for an outgoing call */
-                set_yldisp_dial_tone(0);
-                if (len + 1 < sizeof(ylc_ptr->dialnum)) {
-                  ylc_ptr->dialnum[len + 1] = '\0';
-                  ylc_ptr->dialnum[len] = c;
-                  display_dialnum(ylc_ptr->dialnum);
-                }
-                ylc_ptr->dialback[0] = '\0';
-              }
+  if (value) {
+    /*printf("key=%d\n", code);*/
+    switch (code) {
+      case 2:       /* '1'..'9' */
+      case 3:
+      case 4:
+      case 5:
+      case 6:
+      case 7:
+      case 8:
+      case 9:
+      case 10:
+      case 11:      /* '0' */
+      case 55:      /* '*' */
+      case 103:     /* UP */
+        if (lpstate_power != GSTATE_POWER_ON)
+          break;
+        /* get the real character */
+        c = (code == 55) ? '*' :
+            (code == 4 && ylc_ptr->kshift) ? '#' :
+            (code == 11) ? '0' : ('0' + code - 1);
+
+        if (lpstate_call == GSTATE_CALL_IDLE &&
+            lpstate_reg  == GSTATE_REG_OK) {
+          int len = strlen(ylc_ptr->dialnum);
+
+          if (code == 103) {
+            /* store/recall (cursor up) */
+            if ((len > 0) || ylc_ptr->dialback[0]) {
+              /* prepare to store the currently displayed number */
+              ylc_ptr->prep_store = 1;
+              set_yldisp_store_type(YL_STORE_ON);
             }
             else {
-              /* do not handle '*' for now ... */
+              /* prepare to recall a number */
+              ylc_ptr->prep_recall = 1;
+              set_yldisp_text("  select    ");
             }
           }
           else
-          if (lpstate_call == GSTATE_CALL_OUT_CONNECTED ||
-              lpstate_call == GSTATE_CALL_IN_CONNECTED) {
-            char buf[2];
-            buf[0] = c;
-            buf[1] = '\0';
-            lpstates_submit_command(LPCOMMAND_DTMF, buf);
-          }
-          else
-          if (lpstate_call == GSTATE_CALL_IN_INVITE &&
-              c == '#') {
-            set_yldisp_ringer(YL_RINGER_OFF, 0);
-          }
-          break;
-
-        case 14:         /* KEY_BACKSPACE (C) */
-          if (lpstate_power != GSTATE_POWER_ON)
-            break;
-          if (lpstate_call == GSTATE_CALL_IDLE &&
-              lpstate_reg  == GSTATE_REG_OK) {
-            int len = strlen(ylc_ptr->dialnum);
+          if ((c >= '0' && c <= '9') || c == '*' || c == '#') {
             if (ylc_ptr->prep_store) {
+              /* store number */
+              char *key;
+              key = strdup("mem ");
+              key[3] = c;
+              ypconfig_set_pair(key, (len) ? ylc_ptr->dialnum : ylc_ptr->dialback);
+              free(key);
+              ypconfig_write(NULL);
               ylc_ptr->prep_store = 0;
               set_yldisp_store_type(YL_STORE_NONE);
             }
+            else
+            if (ylc_ptr->prep_recall) {
+              /* recall number but do not dial yet */
+              char *key;
+              char *val;
+              key = strdup("mem ");
+              key[3] = c;
+              val = ypconfig_get_value(key);
+              if (val && *val) {
+                strncpy(ylc_ptr->dialback, val, MAX_NUMBER_LEN);
+              }
+              free(key);
+              ylc_ptr->prep_recall = 0;
+              display_dialnum(ylc_ptr->dialback);
+            }
             else {
-              if (len > 0) {
-                ylc_ptr->dialnum[len - 1] = '\0';
-              }
-              if (ylc_ptr->dialnum[0]) {
+              /* we want to dial for an outgoing call */
+              set_yldisp_dial_tone(0);
+              if (len + 1 < sizeof(ylc_ptr->dialnum)) {
+                ylc_ptr->dialnum[len + 1] = '\0';
+                ylc_ptr->dialnum[len] = c;
                 display_dialnum(ylc_ptr->dialnum);
-                if (ylc_ptr->off_hook)
-                  set_yldisp_dial_tone(1);
-              }
-              else {
-                display_dialnum(ylc_ptr->default_display);
               }
               ylc_ptr->dialback[0] = '\0';
-              ylc_ptr->prep_recall = 0;
             }
           }
-          break;
-
-        case 169:        /* KEY_PHONE (pick up) */
-          ylc_ptr->off_hook = 1;
-          set_yldisp_backlight(1);
-          if (lpstate_call == GSTATE_CALL_IDLE &&
-              lpstate_reg  == GSTATE_REG_OK) {
-            set_yldisp_dial_tone(1);
+          else {
+            /* do not handle '*' for now ... */
           }
-          else
-          if (lpstate_call == GSTATE_CALL_IN_INVITE) {
-            lpstates_submit_command(LPCOMMAND_PICKUP, NULL);
-          }
-          break;
+        }
+        else
+        if (lpstate_call == GSTATE_CALL_OUT_CONNECTED ||
+            lpstate_call == GSTATE_CALL_IN_CONNECTED) {
+          char buf[2];
+          buf[0] = c;
+          buf[1] = '\0';
+          lpstates_submit_command(LPCOMMAND_DTMF, buf);
+        }
+        else
+        if (lpstate_call == GSTATE_CALL_IN_INVITE &&
+            c == '#') {
+          set_yldisp_ringer(YL_RINGER_OFF, 0);
+        }
+        break;
 
-        case 28:         /* KEY_ENTER (send) */
-        case 31:         /* KEY_S (SEND on P4K) */
-          if (lpstate_power != GSTATE_POWER_ON)
-            break;
-          if (lpstate_call == GSTATE_CALL_IDLE &&
-              lpstate_reg  == GSTATE_REG_OK) {
-            if (strlen(ylc_ptr->dialnum) == 0 &&
-                strlen(ylc_ptr->dialback) > 0) {
-              /* dial the current number displayed */
-              strcpy(ylc_ptr->dialnum, ylc_ptr->dialback);
+      case 14:         /* KEY_BACKSPACE (C) */
+        if (lpstate_power != GSTATE_POWER_ON)
+          break;
+        if (lpstate_call == GSTATE_CALL_IDLE &&
+            lpstate_reg  == GSTATE_REG_OK) {
+          int len = strlen(ylc_ptr->dialnum);
+          if (ylc_ptr->prep_store) {
+            ylc_ptr->prep_store = 0;
+            set_yldisp_store_type(YL_STORE_NONE);
+          }
+          else {
+            if (len > 0) {
+              ylc_ptr->dialnum[len - 1] = '\0';
             }
-            if (strlen(ylc_ptr->dialnum) > 0) {
-              set_yldisp_dial_tone(0);
-              strcpy(ylc_ptr->dialback, ylc_ptr->dialnum);
-              lpstates_submit_command(LPCOMMAND_CALL, ylc_ptr->dialnum);
-              
-              /* TODO: add number to history */
-              
-              ylc_ptr->dialnum[0] = '\0';
+            if (ylc_ptr->dialnum[0]) {
+              display_dialnum(ylc_ptr->dialnum);
+              if (ylc_ptr->off_hook)
+                set_yldisp_dial_tone(1);
             }
             else {
-              /* TODO: display history */
+              display_dialnum(ylc_ptr->default_display);
             }
-          }
-          else
-          if (lpstate_call == GSTATE_CALL_IN_INVITE) {
-            lpstates_submit_command(LPCOMMAND_PICKUP, NULL);
-          }
-          break;
-
-        case 170:        /* fake KEY_PHONE (hang up) */
-          ylc_ptr->off_hook = 0;
-          set_yldisp_backlight(0);
-          set_yldisp_dial_tone(0);
-          if (lpstate_call == GSTATE_CALL_OUT_INVITE ||
-              lpstate_call == GSTATE_CALL_OUT_CONNECTED ||
-              lpstate_call == GSTATE_CALL_IN_INVITE ||
-              lpstate_call == GSTATE_CALL_IN_CONNECTED) {
-            lpstates_submit_command(LPCOMMAND_HANGUP, NULL);
-          }
-          break;
-
-        case 1:          /* hang up */
-          if (lpstate_power != GSTATE_POWER_ON)
-            break;
-          set_yldisp_ringer(YL_RINGER_OFF, 0);
-          if (lpstate_call == GSTATE_CALL_OUT_INVITE ||
-              lpstate_call == GSTATE_CALL_OUT_CONNECTED ||
-              lpstate_call == GSTATE_CALL_IN_INVITE ||
-              lpstate_call == GSTATE_CALL_IN_CONNECTED) {
-            lpstates_submit_command(LPCOMMAND_HANGUP, NULL);
-          }
-          else
-          if (lpstate_call == GSTATE_CALL_IDLE &&
-              lpstate_reg  == GSTATE_REG_OK) {
-            ylc_ptr->dialnum[0] = '\0';
             ylc_ptr->dialback[0] = '\0';
-            ylc_ptr->prep_store = 0;
             ylc_ptr->prep_recall = 0;
-            set_yldisp_store_type(YL_STORE_NONE);
-            display_dialnum(ylc_ptr->default_display);
           }
+        }
+        break;
+
+      case 169:        /* KEY_PHONE (pick up) */
+        ylc_ptr->off_hook = 1;
+        set_yldisp_backlight(1);
+        if (lpstate_call == GSTATE_CALL_IDLE &&
+            lpstate_reg  == GSTATE_REG_OK) {
+          set_yldisp_dial_tone(1);
+        }
+        else
+        if (lpstate_call == GSTATE_CALL_IN_INVITE) {
+          lpstates_submit_command(LPCOMMAND_PICKUP, NULL);
+        }
+        break;
+
+      case 28:         /* KEY_ENTER (send) */
+      case 31:         /* KEY_S (SEND on P4K) */
+        if (lpstate_power != GSTATE_POWER_ON)
           break;
-        
-        case 105:        /* KEY_LEFT (VOL-) */
-        case 114:        /* KEY_VOLUMEDOWN */
-          if (lpstate_call == GSTATE_CALL_OUT_CONNECTED ||
-              lpstate_call == GSTATE_CALL_IN_CONNECTED) {
-            lpstates_submit_command(LPCOMMAND_SPKR_VOLDN, NULL);
+        if (lpstate_call == GSTATE_CALL_IDLE &&
+            lpstate_reg  == GSTATE_REG_OK) {
+          if (strlen(ylc_ptr->dialnum) == 0 &&
+              strlen(ylc_ptr->dialback) > 0) {
+            /* dial the current number displayed */
+            strcpy(ylc_ptr->dialnum, ylc_ptr->dialback);
           }
-          else
-          if (lpstate_call == GSTATE_CALL_IN_INVITE /*||
-              lpstate_call == GSTATE_CALL_IDLE*/) {
-            lpstates_submit_command(LPCOMMAND_RING_VOLDN, NULL);
+          if (strlen(ylc_ptr->dialnum) > 0) {
+            set_yldisp_dial_tone(0);
+            strcpy(ylc_ptr->dialback, ylc_ptr->dialnum);
+            lpstates_submit_command(LPCOMMAND_CALL, ylc_ptr->dialnum);
+
+            /* TODO: add number to history */
+
+            ylc_ptr->dialnum[0] = '\0';
           }
-          break;
-        
-        case 106:        /* KEY_RIGHT (VOL+) */
-        case 115:        /* KEY_VOLUMEUP */
-          if (lpstate_call == GSTATE_CALL_OUT_CONNECTED ||
-              lpstate_call == GSTATE_CALL_IN_CONNECTED) {
-            lpstates_submit_command(LPCOMMAND_SPKR_VOLUP, NULL);
+          else {
+            /* TODO: display history */
           }
-          else
-          if (lpstate_call == GSTATE_CALL_IN_INVITE /*||
-              lpstate_call == GSTATE_CALL_IDLE*/) {
-            lpstates_submit_command(LPCOMMAND_RING_VOLUP, NULL);
-          }
+        }
+        else
+        if (lpstate_call == GSTATE_CALL_IN_INVITE) {
+          lpstates_submit_command(LPCOMMAND_PICKUP, NULL);
+        }
+        break;
+
+      case 170:        /* fake KEY_PHONE (hang up) */
+        ylc_ptr->off_hook = 0;
+        set_yldisp_backlight(0);
+        set_yldisp_dial_tone(0);
+        if (lpstate_call == GSTATE_CALL_OUT_INVITE ||
+            lpstate_call == GSTATE_CALL_OUT_CONNECTED ||
+            lpstate_call == GSTATE_CALL_IN_INVITE ||
+            lpstate_call == GSTATE_CALL_IN_CONNECTED) {
+          lpstates_submit_command(LPCOMMAND_HANGUP, NULL);
+        }
+        break;
+
+      case 1:          /* hang up */
+        if (lpstate_power != GSTATE_POWER_ON)
           break;
-        
-        case 108:        /* DOWN */
-          break;
-        
-        default:
-          break;
-      }
+        set_yldisp_ringer(YL_RINGER_OFF, 0);
+        if (lpstate_call == GSTATE_CALL_OUT_INVITE ||
+            lpstate_call == GSTATE_CALL_OUT_CONNECTED ||
+            lpstate_call == GSTATE_CALL_IN_INVITE ||
+            lpstate_call == GSTATE_CALL_IN_CONNECTED) {
+          lpstates_submit_command(LPCOMMAND_HANGUP, NULL);
+        }
+        else
+        if (lpstate_call == GSTATE_CALL_IDLE &&
+            lpstate_reg  == GSTATE_REG_OK) {
+          ylc_ptr->dialnum[0] = '\0';
+          ylc_ptr->dialback[0] = '\0';
+          ylc_ptr->prep_store = 0;
+          ylc_ptr->prep_recall = 0;
+          set_yldisp_store_type(YL_STORE_NONE);
+          display_dialnum(ylc_ptr->default_display);
+        }
+        break;
+
+      case 105:        /* KEY_LEFT (VOL-) */
+      case 114:        /* KEY_VOLUMEDOWN */
+        if (lpstate_call == GSTATE_CALL_OUT_CONNECTED ||
+            lpstate_call == GSTATE_CALL_IN_CONNECTED) {
+          lpstates_submit_command(LPCOMMAND_SPKR_VOLDN, NULL);
+        }
+        else
+        if (lpstate_call == GSTATE_CALL_IN_INVITE /*||
+            lpstate_call == GSTATE_CALL_IDLE*/) {
+          lpstates_submit_command(LPCOMMAND_RING_VOLDN, NULL);
+        }
+        break;
+
+      case 106:        /* KEY_RIGHT (VOL+) */
+      case 115:        /* KEY_VOLUMEUP */
+        if (lpstate_call == GSTATE_CALL_OUT_CONNECTED ||
+            lpstate_call == GSTATE_CALL_IN_CONNECTED) {
+          lpstates_submit_command(LPCOMMAND_SPKR_VOLUP, NULL);
+        }
+        else
+        if (lpstate_call == GSTATE_CALL_IN_INVITE /*||
+            lpstate_call == GSTATE_CALL_IDLE*/) {
+          lpstates_submit_command(LPCOMMAND_RING_VOLUP, NULL);
+        }
+        break;
+
+      case 108:        /* DOWN */
+        break;
+
+      default:
+        break;
     }
   }
 }
