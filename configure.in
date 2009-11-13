@@ -1,7 +1,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.61)
-AC_INIT([yeaphone],[0.1.7],[treitmayr@devbase.at])
+AC_INIT([yeaphone],[0.1.8],[treitmayr@devbase.at])
 AC_CONFIG_AUX_DIR(config)
 
 AC_MSG_NOTICE([$PACKAGE_NAME-$PACKAGE_VERSION       A linphone frontend for external handset devices.])
