@@ -72,11 +72,19 @@ typedef struct ylcontrol_data_s {
   
   int hard_shutdown;
   int linphone_2_1_1_bug;
+
+  LinphoneCore* lc;
 } ylcontrol_data_t;
 
 ylcontrol_data_t ylcontrol_data;
 
 /*****************************************************************/
+
+void setLinphoneCore(LinphoneCore* lc) {
+  ylcontrol_data.lc = lc;
+}
+
+/**********************************/
 
 void display_dialnum(char *num) {
   int len = (num) ? strlen(num) : 0;
@@ -278,9 +286,15 @@ void handle_key(ylcontrol_data_t *ylc_ptr, int code, int value) {
   gstate_t lpstate_call;
   gstate_t lpstate_reg;
   
+#if LINPHONE_MAJOR_VERSION < 3
   lpstate_power = gstate_get_state(GSTATE_GROUP_POWER);
   lpstate_call = gstate_get_state(GSTATE_GROUP_CALL);
   lpstate_reg = gstate_get_state(GSTATE_GROUP_REG);
+#else
+  lpstate_power = linphone_core_get_state(ylc_ptr->lc, GSTATE_GROUP_POWER);
+  lpstate_call = linphone_core_get_state(ylc_ptr->lc, GSTATE_GROUP_CALL);
+  lpstate_reg = linphone_core_get_state(ylc_ptr->lc, GSTATE_GROUP_REG);
+#endif
   
   /* preprocess the key codes */
   switch (code) {
@@ -542,8 +556,13 @@ void handle_long_key(ylcontrol_data_t *ylc_ptr, int code) {
   gstate_t lpstate_power;
   gstate_t lpstate_call;
   
+#if LINPHONE_MAJOR_VERSION < 3
   lpstate_power = gstate_get_state(GSTATE_GROUP_POWER);
   lpstate_call = gstate_get_state(GSTATE_GROUP_CALL);
+#else
+  lpstate_power = linphone_core_get_state(ylc_ptr->lc, GSTATE_GROUP_POWER);
+  lpstate_call = linphone_core_get_state(ylc_ptr->lc, GSTATE_GROUP_CALL);
+#endif
   
   switch (code) {
     case 14:         /* C */
@@ -583,9 +602,15 @@ void lps_callback(struct _LinphoneCore *lc,
   /* make sure this is the same thread as our main loop! */
   assert(yp_ml_same_thread());
   
+#if LINPHONE_MAJOR_VERSION < 3
   lpstate_power = gstate_get_state(GSTATE_GROUP_POWER);
   lpstate_call = gstate_get_state(GSTATE_GROUP_CALL);
   lpstate_reg = gstate_get_state(GSTATE_GROUP_REG);
+#else
+  lpstate_power = linphone_core_get_state(lc, GSTATE_GROUP_POWER);
+  lpstate_call = linphone_core_get_state(lc, GSTATE_GROUP_CALL);
+  lpstate_reg = linphone_core_get_state(lc, GSTATE_GROUP_REG);
+#endif
   
   model = ylsysfs_get_model();
   
@@ -864,7 +889,14 @@ void start_ylcontrol() {
 
 void stop_ylcontrol() {
   ylcontrol_data.hard_shutdown = 1;
-  if (gstate_get_state(GSTATE_GROUP_POWER) == GSTATE_POWER_OFF) {
+  gstate_t lpstate_power;
+
+#if LINPHONE_MAJOR_VERSION < 3
+  lpstate_power = gstate_get_state(GSTATE_GROUP_POWER);
+#else
+  lpstate_power = linphone_core_get_state(ylcontrol_data.lc, GSTATE_GROUP_POWER);
+#endif
+  if (lpstate_power == GSTATE_POWER_OFF) {
     /* already powered off */
     yldisp_hide_all();
     yp_ml_stop();

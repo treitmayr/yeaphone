@@ -26,6 +26,10 @@ LINPHONE_LIBDIR=`$PKG_CONFIG --variable=libdir linphone`
 AC_MSG_RESULT([$LINPHONE_LIBDIR])
 AC_SUBST(LINPHONE_LIBDIR)
 
+AH_TEMPLATE([LINPHONE_MAJOR_VERSION], [Major Version of Linphone])
+lpmvers=`$PKG_CONFIG --modversion linphone | sed 's/\..*//'`
+AC_DEFINE_UNQUOTED(LINPHONE_MAJOR_VERSION, $lpmvers, Major Version of Linphone)
+
 AC_CHECK_LIB(pthread, pthread_kill, [LIBTHREAD=-lpthread])
 AC_SUBST(LIBTHREAD)
 
