@@ -297,6 +297,7 @@ void lpstates_submit_command(lpstates_command_t command, char *arg)
                                     lpcontrol_timer_callback, &lpstates_data);
       linphone_core_init(&(lpstates_data.core_state), lpstates_data.vtable,
                          lpstates_data.configfile_name, &lpstates_data);
+      setLinphoneCore(&(lpstates_data.core_state));
       override_soundcards();
       break;
       

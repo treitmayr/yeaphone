@@ -1,7 +1,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.61)
-AC_INIT([yeaphone],[0.1.7],[treitmayr@devbase.at])
+AC_INIT([yeaphone],[0.1.8],[treitmayr@devbase.at])
 AC_CONFIG_AUX_DIR(config)
 
 AC_MSG_NOTICE([$PACKAGE_NAME-$PACKAGE_VERSION       A linphone frontend for external handset devices.])
@@ -25,6 +25,10 @@ AC_MSG_CHECKING([for liblinphone library path])
 LINPHONE_LIBDIR=`$PKG_CONFIG --variable=libdir linphone`
 AC_MSG_RESULT([$LINPHONE_LIBDIR])
 AC_SUBST(LINPHONE_LIBDIR)
+
+AH_TEMPLATE([LINPHONE_MAJOR_VERSION], [Major Version of Linphone])
+lpmvers=`$PKG_CONFIG --modversion linphone | sed 's/\..*//'`
+AC_DEFINE_UNQUOTED(LINPHONE_MAJOR_VERSION, $lpmvers, Major Version of Linphone)
 
 AC_CHECK_LIB(pthread, pthread_kill, [LIBTHREAD=-lpthread])
 AC_SUBST(LIBTHREAD)
