@@ -1,1 +1,2 @@
-KERNEL=="event*", DRIVERS=="yealink", GROUP="voip", RUN+="/bin/sh -c '/bin/chgrp voip /sys$env{PHYSDEVPATH}/*'"
+KERNEL=="event*", ATTRS{name}=="Yealink*", GROUP="voip", RUN+="/bin/sh -c '/bin/chgrp voip /sys$env{DEVPATH}/device/device/*'"
+ACTION=="add|change", SUBSYSTEMS=="usb", ATTRS{idVendor}=="6993", ATTRS{idProduct}=="b700", RUN+="/usr/sbin/rebind-yealink.sh"
