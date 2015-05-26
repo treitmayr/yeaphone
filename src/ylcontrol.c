@@ -286,7 +286,7 @@ void handle_key(ylcontrol_data_t *ylc_ptr, int code, int value) {
   gstate_t lpstate_call;
   gstate_t lpstate_reg;
   
-#if LINPHONE_MAJOR_VERSION < 3
+#if LINPHONE_VERSION < VERSIONCONV(3,0,0)
   lpstate_power = gstate_get_state(GSTATE_GROUP_POWER);
   lpstate_call = gstate_get_state(GSTATE_GROUP_CALL);
   lpstate_reg = gstate_get_state(GSTATE_GROUP_REG);
@@ -556,7 +556,7 @@ void handle_long_key(ylcontrol_data_t *ylc_ptr, int code) {
   gstate_t lpstate_power;
   gstate_t lpstate_call;
   
-#if LINPHONE_MAJOR_VERSION < 3
+#if LINPHONE_VERSION < VERSIONCONV(3,0,0)
   lpstate_power = gstate_get_state(GSTATE_GROUP_POWER);
   lpstate_call = gstate_get_state(GSTATE_GROUP_CALL);
 #else
@@ -602,7 +602,7 @@ void lps_callback(struct _LinphoneCore *lc,
   /* make sure this is the same thread as our main loop! */
   assert(yp_ml_same_thread());
   
-#if LINPHONE_MAJOR_VERSION < 3
+#if LINPHONE_VERSION < VERSIONCONV(3,0,0)
   lpstate_power = gstate_get_state(GSTATE_GROUP_POWER);
   lpstate_call = gstate_get_state(GSTATE_GROUP_CALL);
   lpstate_reg = gstate_get_state(GSTATE_GROUP_REG);
@@ -891,7 +891,7 @@ void stop_ylcontrol() {
   ylcontrol_data.hard_shutdown = 1;
   gstate_t lpstate_power;
 
-#if LINPHONE_MAJOR_VERSION < 3
+#if LINPHONE_VERSION < VERSIONCONV(3,0,0)
   lpstate_power = gstate_get_state(GSTATE_GROUP_POWER);
 #else
   lpstate_power = linphone_core_get_state(ylcontrol_data.lc, GSTATE_GROUP_POWER);

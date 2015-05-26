@@ -30,6 +30,8 @@
 
 #include <linphone/linphonecore.h>
 
+#define VERSIONCONV(a,b,c,...) (((a) << 16) + ((b) << 8) + (c))
+
 #define LPCONTROL_TIMER_ID  1
 
 typedef enum lpstates_command_e {
